@@ -191,21 +191,77 @@ async def toggle_pause(session_id: str, db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"status": new_status}
 
+class ExtendRequest(BaseModel):
+    additional_rounds: int = 1
+
 @router.post("/{session_id}/extend")
-async def extend_rounds(session_id: str, additional_rounds: int = 2, db: AsyncSession = Depends(get_db)):
+async def extend_rounds(session_id: str, req: Optional[ExtendRequest] = None, additional_rounds: Optional[int] = Query(None), db: AsyncSession = Depends(get_db)):
+    rounds_to_add = req.additional_rounds if req else (additional_rounds or 1)
     stmt = select(SessionModel).where(SessionModel.id == session_id)
     res = await db.execute(stmt)
     session = res.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session.total_rounds += additional_rounds
-    if session.status == "COMPLETED":
-        session.status = "ACTIVE"
+    # Hard cap of maximum 10 rounds as requested
+    new_total = min(10, session.total_rounds + rounds_to_add)
+    if new_total <= session.total_rounds:
+        raise HTTPException(status_code=400, detail="Session is already at the maximum limit of 10 rounds.")
+
+    session.total_rounds = new_total
+    session.status = "ACTIVE"
+
+    # If it was completed, remove old verdict row so judge re-evaluates all turns at the end
+    v_stmt = select(VerdictModel).where(VerdictModel.session_id == session_id)
+    v_res = await db.execute(v_stmt)
+    old_verdict = v_res.scalar_one_or_none()
+    if old_verdict:
+        await db.delete(old_verdict)
+
+    await db.commit()
+    await db.refresh(session)
+
+    # Update active in-memory state
+    if session_id in ACTIVE_STATES:
+        ACTIVE_STATES[session_id].total_rounds = new_total
+        ACTIVE_STATES[session_id].is_completed = False
+        ACTIVE_STATES[session_id].verdict = None
+
+    # Sync to MongoDB
+    from app.core.mongo import save_session_to_mongo
+    save_session_to_mongo({
+        "id": session.id,
+        "topic": session.topic,
+        "mode": session.mode,
+        "total_rounds": session.total_rounds,
+        "current_round": session.current_round,
+        "status": session.status,
+        "file_name": session.file_name
+    })
+
+    return {
+        "id": session.id,
+        "status": session.status,
+        "current_round": session.current_round,
+        "total_rounds": session.total_rounds
+    }
+
+@router.delete("/{session_id}")
+async def delete_session(session_id: str, db: AsyncSession = Depends(get_db)):
+    stmt = select(SessionModel).where(SessionModel.id == session_id)
+    res = await db.execute(stmt)
+    session = res.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    ACTIVE_STATES.pop(session_id, None)
+
+    # Delete from SQLite (cascades to turns, personas, etc.)
+    await db.delete(session)
     await db.commit()
 
-    if session_id in ACTIVE_STATES:
-        ACTIVE_STATES[session_id].total_rounds += additional_rounds
-        ACTIVE_STATES[session_id].is_completed = False
+    # Delete from MongoDB
+    from app.core.mongo import delete_session_from_mongo
+    delete_session_from_mongo(session_id)
 
-    return {"total_rounds": session.total_rounds}
+    return {"status": "deleted", "id": session_id}

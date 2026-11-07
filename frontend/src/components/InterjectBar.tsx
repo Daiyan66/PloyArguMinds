@@ -6,11 +6,18 @@ interface InterjectProps {
   sessionId: string;
   onInterjectSubmitted?: () => void;
   disabled?: boolean;
+  mode?: string;
 }
 
-export const InterjectBar: React.FC<InterjectProps> = ({ sessionId, onInterjectSubmitted, disabled }) => {
+export const InterjectBar: React.FC<InterjectProps> = ({ 
+  sessionId, 
+  onInterjectSubmitted, 
+  disabled,
+  mode = 'DEBATE'
+}) => {
   const [constraint, setConstraint] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isCollab = mode === 'COLLABORATIVE';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,15 +47,19 @@ export const InterjectBar: React.FC<InterjectProps> = ({ sessionId, onInterjectS
           disabled={disabled}
           placeholder={
             disabled
-              ? "Debate concluded"
-              : "Inject steering constraint (e.g. 'Must comply with SOC2' or 'Cap cloud budget at 10%')..."
+              ? (isCollab ? "Collaborative review concluded" : "Dialectic stress-test concluded")
+              : (isCollab
+                  ? "Inject alignment constraint (e.g. 'Must maintain zero-downtime' or 'Cap cloud migration budget')..."
+                  : "Inject steering constraint (e.g. 'Must comply with SOC2' or 'Cap cloud budget at 10%')...")
           }
           className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 transition"
         />
         <button
           type="submit"
           disabled={isSubmitting || !constraint.trim() || disabled}
-          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-30 text-white font-medium p-2.5 sm:px-4 sm:py-2.5 rounded-xl flex items-center gap-1.5 transition text-xs shrink-0"
+          className={`${
+            isCollab ? 'bg-purple-600 hover:bg-purple-500' : 'bg-indigo-600 hover:bg-indigo-500'
+          } disabled:opacity-30 text-white font-medium p-2.5 sm:px-4 sm:py-2.5 rounded-xl flex items-center gap-1.5 transition text-xs shrink-0`}
         >
           <Send size={15} />
           <span className="hidden sm:inline">Steer</span>

@@ -60,6 +60,26 @@ def _sync_save_verdict(session_id: str, verdict_data: Dict[str, Any]):
     except Exception as e:
         print(f"MongoDB save verdict warning: {e}")
 
+def _sync_delete_session(session_id: str):
+    try:
+        db = get_mongo_db()
+        if db is not None:
+            db.sessions.delete_one({"id": session_id})
+            db.turns.delete_many({"session_id": session_id})
+            db.verdicts.delete_one({"session_id": session_id})
+    except Exception as e:
+        print(f"MongoDB delete session warning: {e}")
+
+def delete_session_from_mongo(session_id: str):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.run_in_executor(None, _sync_delete_session, session_id)
+        else:
+            _sync_delete_session(session_id)
+    except Exception:
+        pass
+
 def save_session_to_mongo(session_data: Dict[str, Any]):
     # Non-blocking fire-and-forget
     try:

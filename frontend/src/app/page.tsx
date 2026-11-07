@@ -12,9 +12,11 @@ import {
   Sparkles,
   Sliders,
   X,
-  FileText
+  FileText,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
-import { createSession, uploadDocument } from '../lib/api';
+import { createSession, uploadDocument, deleteSession } from '../lib/api';
 import { useDebateStore } from '../stores/debateStore';
 
 const PRESET_TOPICS = [
@@ -32,13 +34,33 @@ export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
+  const [sessionToDelete, setSessionToDelete] = useState<{ id: string; topic: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
+  const fetchRecent = () => {
     fetch('/api/sessions?limit=8')
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setRecentSessions(data))
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchRecent();
   }, []);
+
+  const handleConfirmDelete = async () => {
+    if (!sessionToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteSession(sessionToDelete.id);
+      setRecentSessions((prev) => prev.filter((s) => s.id !== sessionToDelete.id));
+      setSessionToDelete(null);
+    } catch (err) {
+      alert('Failed to delete session');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -336,7 +358,20 @@ export default function HomePage() {
                           </span>
                         </div>
                       </div>
-                      <ArrowRight size={15} className="text-slate-500 group-hover:text-white shrink-0 transition" />
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSessionToDelete({ id: s.id, topic: s.topic });
+                          }}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 opacity-0 group-hover:opacity-100 transition"
+                          title="Delete session"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                        <ArrowRight size={15} className="text-slate-500 group-hover:text-white shrink-0 transition" />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -345,6 +380,42 @@ export default function HomePage() {
           </div>
         </form>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {sessionToDelete && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-rose-900/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
+            <div className="flex items-center gap-2 text-rose-400 font-bold text-sm mb-2">
+              <AlertTriangle size={18} />
+              <span>Delete Dialectic Session?</span>
+            </div>
+            <p className="text-xs text-slate-300 mb-1 leading-relaxed">
+              Are you sure you want to permanently delete:
+            </p>
+            <p className="text-xs text-white font-medium bg-slate-950 p-2.5 rounded-lg border border-slate-800 mb-4 line-clamp-2">
+              "{sessionToDelete.topic}"
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setSessionToDelete(null)}
+                className="px-3.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 shadow-md shadow-rose-600/30"
+              >
+                {isDeleting ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="border-t border-slate-900 py-3.5 text-center text-xs text-slate-600">

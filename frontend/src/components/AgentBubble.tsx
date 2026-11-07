@@ -173,11 +173,16 @@ export const AgentBubble: React.FC<AgentBubbleProps> = ({ turn, streaming, perso
               {initials}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm text-white">{senderName}</span>
                 {turn && (
                   <span className="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded">
                     Round {turn.round_number}
+                  </span>
+                )}
+                {turn?.phase && turn.phase !== 'CLASH' && turn.phase !== 'FOUNDATION' && turn.phase !== 'THINKING' && (
+                  <span className="text-[10px] font-medium text-indigo-300 bg-indigo-950/60 border border-indigo-800/80 px-2 py-0.5 rounded-md truncate max-w-[220px] sm:max-w-[320px]">
+                    {turn.phase}
                   </span>
                 )}
               </div>

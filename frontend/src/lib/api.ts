@@ -56,9 +56,25 @@ export async function togglePause(sessionId: string): Promise<any> {
   return res.json();
 }
 
-export async function extendRounds(sessionId: string, additional: number = 2): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/extend?additional_rounds=${additional}`, {
-    method: 'POST'
+export async function extendRounds(sessionId: string, additional: number = 1): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/extend`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ additional_rounds: additional })
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Failed to extend session: ${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function deleteSession(sessionId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to delete session: ${res.statusText}`);
+  }
   return res.json();
 }

@@ -114,54 +114,61 @@ class MockLLM:
                 except Exception:
                     pass
 
+            aspect_hint = "Core Architecture"
+            if "ASSIGNED ROUND FOCUS:" in prompt_text:
+                try:
+                    aspect_hint = prompt_text.split("ASSIGNED ROUND FOCUS:")[1].split("\n")[0].strip()
+                except Exception:
+                    pass
+
             is_agent_b = "agent_b" in prompt_text or "Marcus" in prompt_text or "AGAINST" in prompt_text or "Reviewer" in prompt_text
 
-            if "PHASE: FOUNDATION" in prompt_text:
+            if "PHASE: FOUNDATION" in prompt_text or "Architecture" in aspect_hint:
                 if not is_agent_b:
                     content = (
-                        f"**Core Stance:** We strongly advocate for moving forward with: {topic_hint}. "
-                        "Establishing high velocity and modern foundational standards is essential to maintain competitive advantage.\n\n"
-                        "**Key Argument & Evidence:** By modernizing our posture now, empirical industry benchmarks demonstrate a 25-35% reduction in long-term incident resolution times and higher developer satisfaction.\n\n"
-                        "**Rebuttal / Scrutiny:** Concerns regarding transition disruption are valid but can be mitigated through disciplined phased scheduling.\n\n"
-                        "**Bottom Line:** Leadership should endorse this initiative with clear milestones to maintain strategic agility."
+                        f"**Core Stance on {aspect_hint}:** We strongly champion moving forward with {topic_hint}. "
+                        "Establishing high velocity and a modern, domain-isolated foundational standard is essential to eliminate legacy bottlenecks.\n\n"
+                        f"**Key Argument & Evidence:** In terms of {aspect_hint}, empirical industry benchmarks demonstrate a 30-40% reduction in critical path complexity and superior resource determinism under peak load.\n\n"
+                        "**Rebuttal / Scrutiny:** Concerns regarding architectural unfamiliarity are understandable, but clear domain boundaries minimize systemic risk.\n\n"
+                        f"**Bottom Line:** Leadership should validate the architectural soundness of {topic_hint} and greenlight the foundational baseline."
                     )
                 else:
                     content = (
-                        f"**Core Stance:** We urge rigorous prudence regarding: {topic_hint}. "
-                        "Stability, financial discipline, and operational risk containment must take precedence over unproven changes.\n\n"
-                        "**Key Argument & Evidence:** Operational history shows that 60% of rapid architectural shifts exceed initial cost budgets by at least 2x and introduce unforeseen edge-case failure modes.\n\n"
-                        "**Rebuttal / Scrutiny:** Theoretical velocity gains are illusory if production downtime or customer attrition spikes during the transition.\n\n"
-                        "**Bottom Line:** We must mandate strict financial and latency guardrails before committing capital or engineering hours."
+                        f"**Core Stance on {aspect_hint}:** We urge deep scrutiny regarding the structural assumptions of {topic_hint}. "
+                        "Premature architectural complexity inevitably leads to distributed failure cascades and opaque runtime behavior.\n\n"
+                        f"**Key Argument & Evidence:** Regarding {aspect_hint}, historical telemetry reveals that radical shifts introduce undocumented edge-case failure modes and complicate root-cause diagnostics during outages.\n\n"
+                        "**Rebuttal / Scrutiny:** Theoretical architectural purity cannot compensate for the battle-tested predictability of our current baseline.\n\n"
+                        f"**Bottom Line:** We must demand rigorous architectural proof of concept and deterministic fallback topologies before committing."
                     )
-            elif "PHASE: EVIDENCE" in prompt_text:
+            elif "PHASE: EVIDENCE" in prompt_text or "Velocity" in aspect_hint or "TCO" in aspect_hint:
                 if not is_agent_b:
                     content = (
-                        f"**Core Stance:** Concrete operational evidence demonstrates that {topic_hint} yields measurable ROI.\n\n"
-                        "**Key Argument & Evidence:** Benchmark testing across peer organizations shows p99 latency improvements of up to 40% and a 50% decrease in memory footprint.\n\n"
-                        "**Rebuttal / Scrutiny:** The governance team fears budget overruns, but cloud autoscaling and reduced CPU utilization directly drive operational cost downs.\n\n"
-                        "**Bottom Line:** The risk of inaction and technical stagnation is significantly greater than the managed cost of adoption."
+                        f"**Core Stance on {aspect_hint}:** Concrete data establishes that {topic_hint} delivers superior operational returns.\n\n"
+                        f"**Key Argument & Evidence:** Evaluating {aspect_hint}, team delivery metrics show that modern compiler safeguards and automated tooling reduce downstream defect escape rates by 45%.\n\n"
+                        "**Rebuttal / Scrutiny:** The governance reviewer anticipates massive velocity slowdowns, but modular decoupling accelerates independent squad deployments after an initial sprint.\n\n"
+                        f"**Bottom Line:** The measurable gains in {aspect_hint} far outweigh the temporary friction of adoption."
                     )
                 else:
                     content = (
-                        f"**Core Stance:** The proposed benefits of {topic_hint} overlook critical hidden migration and licensing overhead.\n\n"
-                        "**Key Argument & Evidence:** Engineering ramp-up time typically reduces sprint delivery by 20% in the first two quarters, creating backlog debt.\n\n"
-                        "**Rebuttal / Scrutiny:** The advocate's benchmarks reflect idealized lab environments, not legacy production data with accumulated technical debt.\n\n"
-                        "**Bottom Line:** Require an isolated two-sprint proof of concept with strict exit criteria before enterprise-wide greenlighting."
+                        f"**Core Stance on {aspect_hint}:** The projected benefits for {aspect_hint} drastically underestimate hidden frictional costs.\n\n"
+                        f"**Key Argument & Evidence:** Evaluating {aspect_hint}, enterprise retrospectives indicate that steep learning curves reduce team delivery capacity by at least 25% over the first two quarters, compounding backlog debt.\n\n"
+                        "**Rebuttal / Scrutiny:** The advocate assumes optimal team ramp-up, ignoring inevitable hiring scarcity and specialized contractor premiums.\n\n"
+                        f"**Bottom Line:** Require explicit velocity SLAs and hard spend caps before expanding the initiative beyond an isolated squad."
                     )
             else:
                 if not is_agent_b:
                     content = (
-                        f"**Core Stance:** In conclusion, {topic_hint} is a strategic necessity that our team is fully equipped to execute.\n\n"
-                        "**Key Argument & Evidence:** We have validated that canary deployments and fallback toggles reduce rollout risk to near zero.\n\n"
-                        "**Rebuttal / Scrutiny:** We fully accept the requirement for budget caps and 90-day checkpoint reviews proposed by governance.\n\n"
-                        "**Bottom Line:** Approve the staged adoption plan with defined telemetry thresholds."
+                        f"**Core Stance on {aspect_hint}:** In conclusion, {topic_hint} represents a strategic imperative that balances innovation with controlled risk.\n\n"
+                        f"**Key Argument & Evidence:** Across {aspect_hint}, automated canary testing and staged rollback gates provide zero-downtime safety nets for production stability.\n\n"
+                        "**Rebuttal / Scrutiny:** We fully accept the governance recommendation for strict 60-day telemetry milestones and budgetary boundaries.\n\n"
+                        "**Bottom Line:** Endorse the staged rollout with defined review checkpoints to secure strategic competitive advantage."
                     )
                 else:
                     content = (
-                        f"**Core Stance:** We conclude that {topic_hint} can only proceed under strict phased constraints and executive oversight.\n\n"
-                        "**Key Argument & Evidence:** A gated rollout ensuring zero customer impact is the only acceptable path to protect core SLAs.\n\n"
-                        "**Rebuttal / Scrutiny:** We concede that modernizing critical components is desirable once safety nets are verified in staging.\n\n"
-                        "**Bottom Line:** Greenlight a pilot phase only, conditional on hard spend limits and weekly review."
+                        f"**Core Stance on {aspect_hint}:** We maintain that {topic_hint} is only viable under strict executive guardrails and phased milestones.\n\n"
+                        f"**Key Argument & Evidence:** Our analysis of {aspect_hint} mandates that core revenue-critical paths remain untouched until peripheral pilots prove zero customer disruption.\n\n"
+                        "**Rebuttal / Scrutiny:** We acknowledge the advocate's willingness to implement budget caps and automated rollback tripwires.\n\n"
+                        "**Bottom Line:** Authorize a limited-scope pilot only, contingent on hard performance thresholds and weekly executive audits."
                     )
             return MockAIMessage(content)
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useDebateStore } from '../stores/debateStore';
 import { MessageTurn, FallacyAlert } from '../lib/types';
 
-export function useDebateStream(sessionId: string) {
+export function useDebateStream(sessionId: string, reconnectKey: number = 0) {
   const {
     setPersonas,
     appendTurn,
@@ -29,13 +29,22 @@ export function useDebateStream(sessionId: string) {
   const currentSpeakerRef = useRef<{ id: string; name: string; round: number; phase: string } | null>(null);
   const accumulatedTextRef = useRef<string>('');
   const currentTurnFallaciesRef = useRef<FallacyAlert[]>([]);
+  const lastSessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!sessionId) return;
 
-    // Reset Zustand store state for new session ID to prevent old chats concatenating
-    useDebateStore.getState().reset();
-    useDebateStore.getState().setSessionId(sessionId);
+    // Reset store only when switching to a different session ID
+    if (lastSessionIdRef.current !== sessionId) {
+      useDebateStore.getState().reset();
+      useDebateStore.getState().setSessionId(sessionId);
+      lastSessionIdRef.current = sessionId;
+    } else {
+      // Resuming the same session after adding rounds
+      useDebateStore.getState().setIsFinished(false);
+      useDebateStore.getState().setVerdict(null);
+      useDebateStore.getState().setStatusMessage('Resuming dialectic analysis for extended rounds...');
+    }
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
     const streamUrl = `${apiBase}/api/sessions/${sessionId}/stream`;
@@ -117,7 +126,6 @@ export function useDebateStream(sessionId: string) {
         const finalContent = accumulatedTextRef.current;
 
         if (speaker && finalContent.trim()) {
-          // Always look up against fresh store personas to avoid stale closures
           const currentPersonas = useDebateStore.getState().personas;
           const matchingPersona = currentPersonas.find((p) => p.identifier === speaker.id);
           const newTurn: MessageTurn = {
@@ -148,7 +156,7 @@ export function useDebateStream(sessionId: string) {
         const data = JSON.parse(e.data);
         setVerdict(data);
         setIsFinished(true);
-        setStatusMessage('Debate concluded. Executive Decision Memo generated.');
+        setStatusMessage('Analysis concluded. Executive Decision Memo updated.');
         eventSource.close();
       } catch (err) {
         console.error('Error in verdict_ready', err);
@@ -162,7 +170,7 @@ export function useDebateStream(sessionId: string) {
     return () => {
       eventSource.close();
     };
-  }, [sessionId]);
+  }, [sessionId, reconnectKey]);
 
   return {
     personas,
