@@ -1,0 +1,1064 @@
+================================================================================
+MASTER SPECIFICATION & IMPLEMENTATION PROMPT: POLYARGUMINDS (FROM SCRATCH)
+Autonomous Dialectic Stress-Testing Engine & Executive Decision Arbiter
+================================================================================
+
+[ROLE & PURPOSE]
+You are a Principal AI Systems Architect and Staff Full-Stack Engineer.
+Your objective is to build from scratch a production-grade, autonomous multi-agent
+adversarial reasoning and stress-testing platform called "PolyArguMinds".
+
+Do NOT build this as another naive "two chatbots arguing in a chat room."
+PolyArguMinds is an Autonomous Dialectic Stress-Testing Engine—a mission-critical
+platform where founders, executives, engineers, and researchers upload proposals,
+architecture designs, or contentious policy decisions to watch a committee of
+specialized, grounded AI agents red-team the idea and produce a derisked
+Executive Decision Memo.
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+1. High-Level Vision & Paradigm Shift
+2. The Ideal Modern Tech Stack
+3. Multi-Agent Engine Architecture (Cyclic State Machine)
+4. Complete Database Schema (PostgreSQL + pgvector)
+5. Recommended Project Directory Blueprint
+6. Deep-Dive Backend Implementation
+   6.1. State Definition (app/engine/state.py)
+   6.2. LangGraph Cyclic Engine (app/engine/graph.py)
+   6.3. Dynamic Persona Synthesizer (app/engine/nodes/synthesizer.py)
+   6.4. Turn Execution with Phased Guidance (app/engine/nodes/debater.py)
+   6.5. RAG & Grounding Engine (app/engine/tools/rag_search.py)
+   6.6. Real-Time Fallacy Referee (app/engine/nodes/referee.py)
+   6.7. User Interjection Subsystem (app/engine/nodes/interjection.py)
+   6.8. Frontier Judge Evaluation & Decision Memo (app/engine/nodes/judge.py)
+   6.9. Real-Time Server-Sent Events API (app/api/routes_stream.py)
+   6.10. Session & Interjection Management API (app/api/routes_sessions.py)
+7. Deep-Dive Frontend Implementation
+   7.1. Streaming EventSource Consumer (hooks/useDebateStream.ts)
+   7.2. Global State Store (stores/debateStore.ts)
+   7.3. Arena Header, Live Badges & Tension Gauge (components/ArenaHeader.tsx)
+   7.4. Streaming Agent Bubble with Footnotes (components/AgentBubble.tsx)
+   7.5. Real-Time Fallacy & Fact-Check Card (components/FactCard.tsx)
+   7.6. User Interjection & Constraint Bar (components/InterjectBar.tsx)
+   7.7. Executive Decision Memo Modal & PDF Exporter (components/DecisionMemoModal.tsx)
+8. Docker Compose & Environment Configuration
+9. Verification, Test Scenarios & Deployment Checklist
+
+================================================================================
+1. HIGH-LEVEL VISION & PARADIGM SHIFT
+================================================================================
+
+| Dimension | Legacy Prototype Approach | From-Scratch Production Engine |
+| :--- | :--- | :--- |
+| **Philosophy** | Casual chatbot entertainment | Executive-grade dialectic stress-tester |
+| **Agent Personas** | Hardcoded static bots (ProBot, ConBot) | Dynamically synthesized domain experts tailored to topic |
+| **Model Strategy** | Single generic model via string prompts | Tiered routing (Fast LLM for rounds, Frontier for Judge) |
+| **Factual Rigor** | Pure hallucinations & invented studies | Mandatory RAG grounding + live citations + fallacy penalties |
+| **Transport** | Polling via `setInterval(..., 2000)` | Server-Sent Events (SSE) with token streaming (<100ms latency) |
+| **File Handling** | Raw byte blobs stored in MongoDB docs | Object storage (S3/R2) + vector embeddings in PostgreSQL |
+| **Human Control** | Read-only spectator or passive message | Active steering / inject hard constraints into the live graph |
+| **Final Deliverable**| "Winner: ProBot" banner | Multi-rubric Decision Memo, concessions, risks & roadmap |
+
+================================================================================
+2. THE IDEAL MODERN TECH STACK
+================================================================================
+
+- Backend Core: Python 3.11+, FastAPI (Async, WebSockets, Server-Sent Events).
+- Multi-Agent Orchestration: LangGraph / StateGraph (Cyclic, stateful execution).
+- Tiered LLM Inference Routing:
+  * Debater Agents: Gemini 2.0 Flash / Claude 3.5 Haiku / Llama 3.3 70B (High speed, structured output, low cost).
+  * Fallacy Referee: Gemini 2.0 Flash (Ultra-low latency async classification).
+  * Grounding / Fact-Checking: Tavily API or Google Search Grounding.
+  * Chief Adjudicator: Claude 3.5 Sonnet / o3-mini / Gemini 2.0 Pro (Frontier reasoning, strict rubric adjudication).
+- Database & Vector Store: PostgreSQL 16 with pgvector (via SQLAlchemy async + asyncpg).
+- Storage: Cloudflare R2 / AWS S3 with pre-signed URLs (zero binary data in DB).
+- Frontend: Next.js 15+ (App Router) / React 19 + TypeScript + Tailwind CSS + Lucide Icons + Zustand.
+- Real-Time Communication: Server-Sent Events (SSE) via `fetch-event-source` or native `EventSource`.
+
+================================================================================
+3. MULTI-AGENT ENGINE ARCHITECTURE (CYCLIC STATE MACHINE)
+================================================================================
+
+                  ┌─────────────────────────────────────────┐
+                  │ 1. Document / Proposal Ingestion        │
+                  │ (PDF parsing, chunking, pgvector embed) │
+                  └────────────────────┬────────────────────┘
+                                       │
+                                       ▼
+                  ┌─────────────────────────────────────────┐
+                  │ 2. Dynamic Persona Synthesizer          │
+                  │ (Extracts core friction, spawns experts)│
+                  └────────────────────┬────────────────────┘
+                                       │
+      ┌────────────────────────────────┴───────────────────────────────┐
+      │                                                               │
+      ▼                                                               ▼
+┌─────────────────┐       Tool: RAG / Web Search        ┌─────────────────────────┐
+│     Agent A     │ ◄─────────────────────────────────► │      Fact-Checker       │
+│ (Lead Advocate) │                                     │  (Grounding Validation) │
+└────────┬────────┘                                     └────────────┬────────────┘
+         │                                                           │
+         │ Next Turn (SSE Streamed)                                  │ Injects Fallacy Badges
+         ▼                                                           ▼
+┌─────────────────┐       Tool: RAG / Web Search        ┌─────────────────────────┐
+│     Agent B     │ ◄─────────────────────────────────► │       Referee Bot       │
+│ (Chief Skeptic) │                                     │(Detects Fallacies & Rigor)
+└────────┬────────┘                                     └─────────────────────────┘
+         │
+         ▼ (Human-in-the-Loop Interjection Hook)
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Human Interjection Hook: Insert Constraint / Steering    │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ (Loop until round limit)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. Chief Adjudication & Executive Synthesis                 │
+│ (Frontier Judge: Rubric Evaluation & Derisked Decision Memo)│
+└─────────────────────────────────────────────────────────────┘
+
+================================================================================
+4. COMPLETE DATABASE SCHEMA (POSTGRESQL + PGVECTOR)
+================================================================================
+
+```sql
+-- Enable Extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 1. Sessions Table
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    topic TEXT NOT NULL,
+    mode VARCHAR(32) NOT NULL DEFAULT 'DEBATE', -- 'DEBATE' (Red-Team) or 'COLLABORATIVE' (Design Review)
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE', -- 'ACTIVE', 'PAUSED', 'COMPLETED'
+    total_rounds INT NOT NULL DEFAULT 5,
+    current_round INT NOT NULL DEFAULT 1,
+    file_name TEXT,
+    file_url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Document Chunks for Semantic Grounding (RAG)
+CREATE TABLE document_chunks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    page_number INT NOT NULL DEFAULT 1,
+    chunk_index INT NOT NULL,
+    content TEXT NOT NULL,
+    embedding vector(1536), -- Compatible with text-embedding-3-small or gemini embeddings
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_document_chunks_session ON document_chunks(session_id);
+CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- 3. Dynamic Personas
+CREATE TABLE personas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    identifier VARCHAR(32) NOT NULL, -- 'agent_a', 'agent_b', 'judge'
+    name VARCHAR(64) NOT NULL,
+    role_title VARCHAR(128) NOT NULL,
+    bias_direction VARCHAR(32) NOT NULL, -- 'FOR', 'AGAINST', 'NEUTRAL'
+    core_worldview TEXT NOT NULL,
+    system_prompt TEXT NOT NULL,
+    avatar_color VARCHAR(16) NOT NULL DEFAULT '#6366F1',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. Debate Turns / Transcript
+CREATE TABLE turns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    persona_id UUID REFERENCES personas(id),
+    round_number INT NOT NULL,
+    phase VARCHAR(32) NOT NULL, -- 'FOUNDATION', 'EVIDENCE', 'CLASH', 'INTERJECTION'
+    content TEXT NOT NULL,
+    citations JSONB DEFAULT '[]', -- [{ "source": "page 4", "snippet": "..." }]
+    fallacies JSONB DEFAULT '[]', -- [{ "type": "Strawman", "quote": "...", "explanation": "..." }]
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_turns_session_round ON turns(session_id, round_number);
+
+-- 5. Human Interjections (Steering Constraints)
+CREATE TABLE interjections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
+    user_name VARCHAR(64) NOT NULL DEFAULT 'Moderator',
+    content TEXT NOT NULL,
+    target_persona_id UUID REFERENCES personas(id), -- Nullable: applies to both or specific agent
+    applied_to_round INT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 6. Adjudication & Executive Decision Memos
+CREATE TABLE verdicts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE UNIQUE,
+    winner_identifier VARCHAR(32),
+    scorecard JSONB NOT NULL,
+    key_concessions JSONB DEFAULT '[]',
+    unresolved_risks JSONB DEFAULT '[]',
+    executive_recommendation TEXT NOT NULL,
+    action_plan JSONB DEFAULT '[]',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+================================================================================
+5. RECOMMENDED PROJECT DIRECTORY BLUEPRINT
+================================================================================
+
+```text
+polyarguminds/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── routes_sessions.py      # Session creation, interjection, pausing, extend
+│   │   │   ├── routes_stream.py        # SSE live token & event streaming
+│   │   │   └── routes_files.py         # Multipart PDF upload, chunking & vectorization
+│   │   ├── core/
+│   │   │   ├── config.py               # Pydantic Settings (API keys, DB URLs)
+│   │   │   └── db.py                   # Async SQLAlchemy engine & session factory
+│   │   ├── engine/
+│   │   │   ├── state.py                # Typed Pydantic state definition for LangGraph
+│   │   │   ├── graph.py                # StateGraph assembly, cyclic edges, router
+│   │   │   ├── nodes/
+│   │   │   │   ├── synthesizer.py      # Dynamic persona generation node
+│   │   │   │   ├── debater.py          # Phase-guided debater turn execution
+│   │   │   │   ├── referee.py          # Real-time fallacy detector & citation checker
+│   │   │   │   ├── interjection.py     # Human steering & constraint injection
+│   │   │   │   └── judge.py            # Frontier rubric scoring & decision memo
+│   │   │   └── tools/
+│   │   │       ├── rag_search.py       # pgvector cosine similarity lookup
+│   │   │       └── web_search.py       # Live search (Tavily/Google) tool
+│   │   ├── models/                     # SQLAlchemy ORM models
+│   │   └── main.py                     # FastAPI application factory & CORS setup
+│   ├── tests/
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── layout.tsx              # Root layout with dark mode palette
+│   │   │   ├── page.tsx                # Topic submission, file dropzone & mode config
+│   │   │   └── debate/[id]/page.tsx    # Real-time debate stage & arena
+│   │   ├── components/
+│   │   │   ├── ArenaHeader.tsx         # Round progress circle, tension gauge & status
+│   │   │   ├── AgentBubble.tsx         # Real-time streamed message with footnote popups
+│   │   │   ├── FactCard.tsx            # Inline clickable citations & verified sources
+│   │   │   ├── FallacyBadge.tsx        # Highlighted fallacy badges with explanations
+│   │   │   ├── InterjectBar.tsx        # Sticky human-in-the-loop steering prompt bar
+│   │   │   ├── DecisionMemoModal.tsx   # Executive briefing, radar chart & PDF export
+│   │   │   └── PersonaCard.tsx         # Active speaker spotlight & stance profile
+│   │   ├── hooks/
+│   │   │   └── useDebateStream.ts      # Native EventSource hook with reconnection logic
+│   │   ├── stores/
+│   │   │   └── debateStore.ts          # Zustand store for turns, streaming text, and state
+│   │   └── lib/
+│   │       ├── api.ts                  # Fetch / Axios HTTP client
+│   │       └── types.ts                # TypeScript interfaces matching backend models
+│   ├── package.json
+│   ├── tailwind.config.ts
+│   └── tsconfig.json
+│
+├── docker-compose.yml                  # PostgreSQL (pgvector) + Backend + Frontend
+└── .env.example                        # Documented environment variables template
+```
+
+================================================================================
+6. DEEP-DIVE BACKEND IMPLEMENTATION
+================================================================================
+
+### 6.1. State Definition (backend/app/engine/state.py)
+```python
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+
+class Citation(BaseModel):
+    source_title: str
+    page_number: Optional[int] = None
+    url: Optional[str] = None
+    snippet: str
+
+class FallacyAlert(BaseModel):
+    fallacy_type: str  # "STRAWMAN", "AD_HOMINEM", "FALSE_DICHOTOMY", "SLIPPERY_SLOPE", "CIRCULAR"
+    quote: str
+    explanation: str
+
+class MessageTurn(BaseModel):
+    id: str
+    speaker_id: str
+    sender_name: str
+    role_title: str
+    round_number: int
+    phase: str  # "FOUNDATION", "EVIDENCE", "CLASH", "INTERJECTION"
+    content: str
+    citations: List[Citation] = Field(default_factory=list)
+    fallacies: List[FallacyAlert] = Field(default_factory=list)
+
+class Persona(BaseModel):
+    id: str
+    identifier: str  # "agent_a", "agent_b", "judge"
+    name: str
+    role_title: str
+    bias_direction: str  # "FOR", "AGAINST", "NEUTRAL"
+    core_worldview: str
+    system_prompt: str
+    avatar_color: str = "#6366F1"
+
+class HumanInterjection(BaseModel):
+    user_name: str = "Moderator"
+    content: str
+    target_persona_id: Optional[str] = None
+
+class DebateState(BaseModel):
+    session_id: str
+    topic: str
+    mode: str = "DEBATE"
+    document_context: Optional[str] = None
+    personas: List[Persona] = Field(default_factory=list)
+    turns: List[MessageTurn] = Field(default_factory=list)
+    current_round: int = 1
+    total_rounds: int = 5
+    active_persona_idx: int = 0
+    is_completed: bool = False
+    pending_interjections: List[HumanInterjection] = Field(default_factory=list)
+    verdict: Optional[Dict[str, Any]] = None
+```
+
+### 6.2. LangGraph Cyclic Engine (backend/app/engine/graph.py)
+```python
+from langgraph.graph import StateGraph, END
+from app.engine.state import DebateState
+from app.engine.nodes.synthesizer import synthesize_personas_node
+from app.engine.nodes.debater import debater_turn_node
+from app.engine.nodes.referee import referee_audit_node
+from app.engine.nodes.interjection import apply_interjections_node
+from app.engine.nodes.judge import judge_adjudication_node
+
+def route_next_step(state: DebateState) -> str:
+    # 2 turns per round (Agent A then Agent B)
+    if state.is_completed or (state.current_round > state.total_rounds):
+        return "judge"
+    if len(state.pending_interjections) > 0:
+        return "apply_interjections"
+    return "debater"
+
+def build_debate_graph():
+    workflow = StateGraph(DebateState)
+
+    workflow.add_node("synthesizer", synthesize_personas_node)
+    workflow.add_node("debater", debater_turn_node)
+    workflow.add_node("referee", referee_audit_node)
+    workflow.add_node("apply_interjections", apply_interjections_node)
+    workflow.add_node("judge", judge_adjudication_node)
+
+    # Initial flow
+    workflow.set_entry_point("synthesizer")
+    workflow.add_edge("synthesizer", "debater")
+    workflow.add_edge("debater", "referee")
+    
+    # Cyclic router
+    workflow.add_conditional_edges(
+        "referee",
+        route_next_step,
+        {
+            "debater": "debater",
+            "apply_interjections": "apply_interjections",
+            "judge": "judge"
+        }
+    )
+    workflow.add_edge("apply_interjections", "debater")
+    workflow.add_edge("judge", END)
+
+    return workflow.compile()
+```
+
+### 6.3. Dynamic Persona Synthesizer (backend/app/engine/nodes/synthesizer.py)
+```python
+import json
+import uuid
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.engine.state import DebateState, Persona
+
+SYNTHESIZER_SYSTEM_PROMPT = """
+You are an expert Debate Architect and Dialectic Systems Designer.
+Analyze the provided topic and reference document context.
+Identify the primary underlying tension (e.g. Innovation vs Compliance,
+Security vs Velocity, High CapEx vs Capital Efficiency, Freedom vs Regulation).
+
+Design two opposing world-class expert personas who would authentically clash
+over this topic, plus an impartial senior decision-maker as the judge.
+
+Output strictly valid JSON with this schema:
+{
+  "personas": [
+    {
+      "identifier": "agent_a",
+      "name": "First Last",
+      "role_title": "Specific Professional Title",
+      "bias_direction": "FOR",
+      "core_worldview": "Short summary of their core perspective",
+      "avatar_color": "#4F46E5",
+      "system_prompt": "Direct instructions for their debate persona, priorities, and debate style."
+    },
+    {
+      "identifier": "agent_b",
+      "name": "First Last",
+      "role_title": "Specific Professional Counter-Title",
+      "bias_direction": "AGAINST",
+      "core_worldview": "Short summary of their opposing perspective",
+      "avatar_color": "#DC2626",
+      "system_prompt": "Direct instructions for their counter-persona, priorities, and debate style."
+    }
+  ]
+}
+"""
+
+async def synthesize_personas_node(state: DebateState, llm) -> DebateState:
+    context = f"Topic: {state.topic}\n\nDocument Reference:\n{state.document_context or 'None provided.'}"
+    response = await llm.ainvoke([
+        SystemMessage(content=SYNTHESIZER_SYSTEM_PROMPT),
+        HumanMessage(content=context)
+    ])
+    
+    parsed = json.loads(response.content)
+    personas_list = []
+    for p in parsed["personas"]:
+        personas_list.append(Persona(
+            id=str(uuid.uuid4()),
+            identifier=p["identifier"],
+            name=p["name"],
+            role_title=p["role_title"],
+            bias_direction=p["bias_direction"],
+            core_worldview=p["core_worldview"],
+            system_prompt=p["system_prompt"],
+            avatar_color=p.get("avatar_color", "#4F46E5")
+        ))
+    state.personas = personas_list
+    return state
+```
+
+### 6.4. Turn Execution with Phased Guidance (backend/app/engine/nodes/debater.py)
+```python
+import uuid
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.engine.state import DebateState, MessageTurn
+from app.engine.tools.rag_search import retrieve_semantic_context
+
+def determine_phase_prompt(current_round: int, total_rounds: int) -> tuple[str, str]:
+    progress = current_round / total_rounds
+    if progress <= 0.33:
+        return (
+            "FOUNDATION",
+            "PHASE: FOUNDATION. Clearly define your terms, boundary conditions, and primary logical premise. "
+            "Do not hand-wave. Establish the core ethical, technical, or financial thesis."
+        )
+    elif progress <= 0.66:
+        return (
+            "EVIDENCE",
+            "PHASE: EVIDENCE & CROSS-EXAMINATION. You MUST back your claims with concrete empirical precedent, "
+            "metrics, or data points from the provided context. Pure abstract rhetoric will be penalized."
+        )
+    else:
+        return (
+            "CLASH",
+            "PHASE: DIRECT CLASH & DECONSTRUCTION. Target the opponent's previous argument. Expose flaws in their "
+            "assumptions, hidden costs, or logical leaps. Do not simply restate your earlier points."
+        )
+
+async def debater_turn_node(state: DebateState, llm, db_session) -> DebateState:
+    active_persona = state.personas[state.active_persona_idx % 2]
+    phase_name, phase_instruction = determine_phase_prompt(state.current_round, state.total_rounds)
+
+    # 1. Retrieve RAG grounding chunks if document was uploaded
+    rag_context = ""
+    if state.document_context:
+        # Search relevant chunks using last opponent message or topic as query
+        query = state.turns[-1].content if state.turns else state.topic
+        chunks = await retrieve_semantic_context(state.session_id, query, db_session, top_k=3)
+        if chunks:
+            rag_context = "\n### RELEVANT DOCUMENT CONTEXT ###\n" + "\n".join(
+                f"[Source: {c['file_name']}, Page {c['page_number']}]: {c['content']}" for c in chunks
+            )
+
+    # 2. Build Sliding Conversation Window (last 4 turns)
+    recent_history = "\n\n".join(
+        f"[{t.role_title} - {t.sender_name}]:\n{t.content}"
+        for t in state.turns[-4:]
+    )
+
+    full_system = f"{active_persona.system_prompt}\n\n{phase_instruction}\n{rag_context}"
+    user_prompt = f"TOPIC: {state.topic}\n\nRECENT DIALECTIC HISTORY:\n{recent_history or 'Opening statement.'}\n\nYOUR RESPONSE:"
+
+    response = await llm.ainvoke([
+        SystemMessage(content=full_system),
+        HumanMessage(content=user_prompt)
+    ])
+
+    new_turn = MessageTurn(
+        id=str(uuid.uuid4()),
+        speaker_id=active_persona.identifier,
+        sender_name=active_persona.name,
+        role_title=active_persona.role_title,
+        round_number=state.current_round,
+        phase=phase_name,
+        content=response.content,
+        citations=[],
+        fallacies=[]
+    )
+
+    state.turns.append(new_turn)
+    state.active_persona_idx += 1
+    if state.active_persona_idx % 2 == 0:
+        state.current_round += 1
+
+    return state
+```
+
+### 6.5. RAG & Grounding Engine (backend/app/engine/tools/rag_search.py)
+```python
+from sqlalchemy import text
+import openai
+
+async def generate_embedding(text_content: str) -> list[float]:
+    # Replace with OpenAI or Gemini embedding call
+    response = await openai.AsyncOpenAI().embeddings.create(
+        model="text-embedding-3-small",
+        input=text_content
+    )
+    return response.data[0].embedding
+
+async def retrieve_semantic_context(session_id: str, query: str, db_session, top_k: int = 3) -> list[dict]:
+    query_vector = await generate_embedding(query)
+    
+    stmt = text("""
+        SELECT file_name, page_number, content, 
+               1 - (embedding <=> :vector::vector) AS similarity
+        FROM document_chunks
+        WHERE session_id = :session_id
+        ORDER BY similarity DESC
+        LIMIT :top_k
+    """)
+    
+    result = await db_session.execute(stmt, {
+        "vector": str(query_vector),
+        "session_id": session_id,
+        "top_k": top_k
+    })
+    
+    rows = result.fetchall()
+    return [{"file_name": r[0], "page_number": r[1], "content": r[2], "similarity": float(r[3])} for r in rows]
+```
+
+### 6.6. Real-Time Fallacy Referee (backend/app/engine/nodes/referee.py)
+```python
+import json
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.engine.state import DebateState, FallacyAlert
+
+REFEREE_PROMPT = """
+You are an uncompromising Formal Logician and Debate Referee.
+Examine the active speaker's latest response in light of the opponent's previous statement.
+Detect any of the following informal fallacies:
+- STRAWMAN: Misrepresenting or caricaturing the opponent's claim.
+- AD_HOMINEM: Attacking persona traits or motives instead of substance.
+- FALSE_DICHOTOMY: Presenting a false either/or binary.
+- SLIPPERY_SLOPE: Claiming an extreme, unjustified chain of disasters.
+- CIRCULAR_REASONING: Assuming the conclusion in the premise.
+
+Output strictly valid JSON with this schema:
+{
+  "fallacies": [
+    {
+      "fallacy_type": "STRAWMAN | AD_HOMINEM | FALSE_DICHOTOMY | SLIPPERY_SLOPE | CIRCULAR_REASONING",
+      "quote": "Exact verbatim quote from the active message",
+      "explanation": "Concise 1-sentence breakdown of why this is logically flawed."
+    }
+  ]
+}
+If no fallacies are present, return { "fallacies": [] }.
+"""
+
+async def referee_audit_node(state: DebateState, fast_llm) -> DebateState:
+    if len(state.turns) < 2:
+        return state
+
+    latest_turn = state.turns[-1]
+    preceding_turn = state.turns[-2]
+
+    context = f"OPPONENT SAID:\n{preceding_turn.content}\n\nACTIVE SPEAKER REPLIED:\n{latest_turn.content}"
+
+    try:
+        response = await fast_llm.ainvoke([
+            SystemMessage(content=REFEREE_PROMPT),
+            HumanMessage(content=context)
+        ])
+        data = json.loads(response.content)
+        for f in data.get("fallacies", []):
+            latest_turn.fallacies.append(FallacyAlert(
+                fallacy_type=f["fallacy_type"],
+                quote=f["quote"],
+                explanation=f["explanation"]
+            ))
+    except Exception as e:
+        print(f"Referee audit skipped: {e}")
+
+    return state
+```
+
+### 6.7. User Interjection Subsystem (backend/app/engine/nodes/interjection.py)
+```python
+import uuid
+from app.engine.state import DebateState, MessageTurn
+
+async def apply_interjections_node(state: DebateState) -> DebateState:
+    while state.pending_interjections:
+        interjection = state.pending_interjections.pop(0)
+        
+        # Insert a special moderator turn into transcript
+        moderator_turn = MessageTurn(
+            id=str(uuid.uuid4()),
+            speaker_id="moderator",
+            sender_name=interjection.user_name,
+            role_title="Human Moderator",
+            round_number=state.current_round,
+            phase="INTERJECTION",
+            content=f"⚠️ MODERATOR CONSTRAINT INJECTED: \"{interjection.content}\". Both participants must incorporate this requirement immediately.",
+            citations=[],
+            fallacies=[]
+        )
+        state.turns.append(moderator_turn)
+        
+    return state
+```
+
+### 6.8. Frontier Judge Evaluation & Decision Memo (backend/app/engine/nodes/judge.py)
+```python
+import json
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.engine.state import DebateState
+
+JUDGE_PROMPT = """
+You are the Chief Adjudicator and Senior Strategic Decision Arbiter.
+Review the complete dialectic exchange below.
+Your objective is NOT to declare a shallow winner, but to deliver an Executive Decision Memo that derisks this topic.
+
+Follow this strict rubric:
+1. SCORING MATRIX (0.0 to 10.0 for each debater):
+   - Logical Rigor (consistency, deductive validity, avoidance of fallacies)
+   - Evidence Grounding (factual verifiability, use of citations/context)
+   - Rebuttal Directness (ability to dismantle the opponent's core points)
+2. KEY CONCESSIONS: List points where either side legitimately conceded ground.
+3. UNRESOLVED BLIND SPOTS: Critical failure modes or edge-cases neither party addressed.
+4. EXECUTIVE RECOMMENDATION: Deliver an unambiguous strategic verdict:
+   (e.g., 'PROCEED WITH CONDITIONAL PILOT', 'REJECT PROPOSAL', 'HYBRID STAGED ROLLOUT').
+5. ACTION PLAN: 3 to 5 prioritized, concrete next steps.
+
+Output strictly valid JSON with this schema:
+{
+  "winner_identifier": "agent_a | agent_b | TIE",
+  "scorecard": {
+    "agent_a": { "logical_rigor": 8.5, "evidence_grounding": 9.0, "rebuttal_directness": 8.0, "total": 8.5 },
+    "agent_b": { "logical_rigor": 7.0, "evidence_grounding": 6.5, "rebuttal_directness": 8.5, "total": 7.3 }
+  },
+  "key_concessions": ["..."],
+  "unresolved_risks": ["..."],
+  "executive_recommendation": "...",
+  "action_plan": ["Step 1", "Step 2", "Step 3"]
+}
+"""
+
+async def judge_adjudication_node(state: DebateState, frontier_llm) -> DebateState:
+    full_transcript = "\n\n".join(
+        f"[{t.role_title} - {t.sender_name} (Round {t.round_number} - {t.phase})]:\n{t.content}"
+        for t in state.turns
+    )
+    
+    response = await frontier_llm.ainvoke([
+        SystemMessage(content=JUDGE_PROMPT),
+        HumanMessage(content=f"TOPIC: {state.topic}\n\nFULL TRANSCRIPT:\n{full_transcript}")
+    ])
+    
+    parsed = json.loads(response.content)
+    state.verdict = parsed
+    state.is_completed = True
+    return state
+```
+
+### 6.9. Real-Time Server-Sent Events API (backend/app/api/routes_stream.py)
+```python
+from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
+import asyncio
+import json
+
+router = APIRouter()
+
+@router.get("/api/sessions/{session_id}/stream")
+async def stream_debate(session_id: str):
+    async def event_generator():
+        # Retrieve active state or load from DB
+        state = await load_debate_state(session_id)
+        
+        # 1. Emit Initial Personas
+        yield f"event: personas_ready\ndata: {json.dumps([p.dict() for p in state.personas])}\n\n"
+
+        while not state.is_completed:
+            active_persona = state.personas[state.active_persona_idx % 2]
+            
+            # 2. Turn Start Event
+            yield f"event: turn_start\ndata: {json.dumps({'speaker_id': active_persona.identifier, 'name': active_persona.name, 'round': state.current_round})}\n\n"
+
+            # 3. Stream Tokens Character-by-Character
+            async for token in stream_agent_tokens(state, active_persona):
+                yield f"event: token\ndata: {json.dumps({'token': token})}\n\n"
+                await asyncio.sleep(0.015) # Paced delivery
+
+            # 4. Fallacy & Citation Audit Emit
+            turn = state.turns[-1]
+            if turn.fallacies:
+                for f in turn.fallacies:
+                    yield f"event: fallacy_alert\ndata: {json.dumps(f.dict())}\n\n"
+
+            yield f"event: turn_end\ndata: {json.dumps({'turn_id': turn.id})}\n\n"
+            
+            # Step graph forward
+            await advance_graph_step(state)
+            await asyncio.sleep(1.0) # Organic human-like pause
+
+        # 5. Final Adjudication
+        yield f"event: verdict_ready\ndata: {json.dumps(state.verdict)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+```
+
+================================================================================
+7. DEEP-DIVE FRONTEND IMPLEMENTATION
+================================================================================
+
+### 7.1. Streaming EventSource Consumer (frontend/src/hooks/useDebateStream.ts)
+```typescript
+import { useState, useEffect, useRef } from 'react';
+import { MessageTurn, Persona, Verdict, FallacyAlert } from '../lib/types';
+
+export function useDebateStream(sessionId: string) {
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [turns, setTurns] = useState<MessageTurn[]>([]);
+  const [activeSpeakerId, setActiveSpeakerId] = useState<string | null>(null);
+  const [currentStreamedText, setCurrentStreamedText] = useState<string>('');
+  const [fallacies, setFallacies] = useState<FallacyAlert[]>([]);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [isFinished, setIsFinished] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const eventSource = new EventSource(`/api/sessions/${sessionId}/stream`);
+
+    eventSource.addEventListener('personas_ready', (e) => {
+      setPersonas(JSON.parse(e.data));
+    });
+
+    eventSource.addEventListener('turn_start', (e) => {
+      const data = JSON.parse(e.data);
+      setActiveSpeakerId(data.speaker_id);
+      setCurrentStreamedText('');
+    });
+
+    eventSource.addEventListener('token', (e) => {
+      const { token } = JSON.parse(e.data);
+      setCurrentStreamedText((prev) => prev + token);
+    });
+
+    eventSource.addEventListener('fallacy_alert', (e) => {
+      const fallacy: FallacyAlert = JSON.parse(e.data);
+      setFallacies((prev) => [...prev, fallacy]);
+    });
+
+    eventSource.addEventListener('turn_end', (e) => {
+      setCurrentStreamedText('');
+      setActiveSpeakerId(null);
+      // Fetch latest completed turns or append
+    });
+
+    eventSource.addEventListener('verdict_ready', (e) => {
+      setVerdict(JSON.parse(e.data));
+      setIsFinished(true);
+      eventSource.close();
+    });
+
+    eventSource.onerror = (err) => {
+      console.error('SSE Error:', err);
+      eventSource.close();
+    };
+
+    return () => eventSource.close();
+  }, [sessionId]);
+
+  return { personas, turns, activeSpeakerId, currentStreamedText, fallacies, verdict, isFinished };
+}
+```
+
+### 7.2. User Interjection & Constraint Bar (frontend/src/components/InterjectBar.tsx)
+```tsx
+import React, { useState } from 'react';
+import { Send, ShieldAlert, Pause, Play } from 'lucide-react';
+
+interface InterjectProps {
+  sessionId: string;
+  onInterjectSubmitted: () => void;
+}
+
+export const InterjectBar: React.FC<InterjectProps> = ({ sessionId, onInterjectSubmitted }) => {
+  const [constraint, setConstraint] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!constraint.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      await fetch(`/api/sessions/${sessionId}/interject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: constraint })
+      });
+      setConstraint('');
+      onInterjectSubmitted();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 p-4 bg-slate-900/95 backdrop-blur border-t border-slate-800 z-40">
+      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto flex items-center gap-3">
+        <div className="flex items-center gap-2 text-amber-400 font-semibold text-sm whitespace-nowrap">
+          <ShieldAlert size={18} />
+          <span>Steer Debate:</span>
+        </div>
+        <input
+          type="text"
+          value={constraint}
+          onChange={(e) => setConstraint(e.target.value)}
+          placeholder="Inject a mandatory constraint (e.g. 'Must comply with HIPAA regulations' or 'Cap budget at $500k')..."
+          className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button
+          type="submit"
+          disabled={isSubmitting || !constraint.trim()}
+          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium px-4 py-2.5 rounded-lg flex items-center gap-2 transition"
+        >
+          <Send size={16} />
+          <span>Inject</span>
+        </button>
+      </form>
+    </div>
+  );
+};
+```
+
+### 7.3. Executive Decision Memo Modal & PDF Exporter (frontend/src/components/DecisionMemoModal.tsx)
+```tsx
+import React from 'react';
+import { Award, CheckCircle2, AlertTriangle, Download, X } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Verdict } from '../lib/types';
+
+interface MemoModalProps {
+  verdict: Verdict;
+  topic: string;
+  onClose: () => void;
+}
+
+export const DecisionMemoModal: React.FC<MemoModalProps> = ({ verdict, topic, onClose }) => {
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('EXECUTIVE DECISION MEMORANDUM', 14, 22);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Topic: ${topic}`, 14, 30);
+    doc.text(`Recommendation: ${verdict.executive_recommendation}`, 14, 38);
+
+    autoTable(doc, {
+      startY: 46,
+      head: [['Dimension', 'Agent A Score', 'Agent B Score']],
+      body: [
+        ['Logical Rigor', `${verdict.scorecard.agent_a.logical_rigor}/10`, `${verdict.scorecard.agent_b.logical_rigor}/10`],
+        ['Evidence Grounding', `${verdict.scorecard.agent_a.evidence_grounding}/10`, `${verdict.scorecard.agent_b.evidence_grounding}/10`],
+        ['Rebuttal Directness', `${verdict.scorecard.agent_a.rebuttal_directness}/10`, `${verdict.scorecard.agent_b.rebuttal_directness}/10`],
+      ],
+    });
+
+    doc.save(`Decision_Memo_${Date.now()}.pdf`);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-8 shadow-2xl">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <div className="flex items-center gap-2 text-indigo-400 font-semibold text-sm mb-1 uppercase tracking-wider">
+              <Award size={18} />
+              <span>Executive Briefing</span>
+            </div>
+            <h2 className="text-2xl font-bold text-white">Dialectic Stress-Test Result</h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="bg-indigo-950/40 border border-indigo-800/50 rounded-xl p-5 mb-6">
+          <h3 className="text-sm font-semibold text-indigo-300 uppercase tracking-wider mb-2">Final Recommendation</h3>
+          <p className="text-lg font-medium text-white">{verdict.executive_recommendation}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <h4 className="flex items-center gap-2 text-emerald-400 font-semibold text-sm mb-2">
+              <CheckCircle2 size={16} /> Key Concessions
+            </h4>
+            <ul className="text-sm text-slate-300 space-y-1 list-disc list-inside">
+              {verdict.key_concessions.map((c, i) => <li key={i}>{c}</li>)}
+            </ul>
+          </div>
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+            <h4 className="flex items-center gap-2 text-amber-400 font-semibold text-sm mb-2">
+              <AlertTriangle size={16} /> Unresolved Blind Spots
+            </h4>
+            <ul className="text-sm text-slate-300 space-y-1 list-disc list-inside">
+              {verdict.unresolved_risks.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          </div>
+        </div>
+
+        <button
+          onClick={exportPDF}
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 transition"
+        >
+          <Download size={18} />
+          <span>Export Formal Decision Memo (PDF)</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+```
+
+================================================================================
+8. DOCKER COMPOSE & ENVIRONMENT CONFIGURATION
+================================================================================
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: polyarguminds
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@db:5432/polyarguminds
+      - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+
+volumes:
+  postgres_data:
+```
+
+### Environment Variables Template (.env.example)
+```ini
+# Database & Cache
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/polyarguminds
+REDIS_URL=redis://localhost:6379/0
+
+# LLM Providers (Tiered Routing)
+FAST_LLM_PROVIDER=gemini # 'gemini' | 'groq' | 'openrouter'
+FAST_LLM_MODEL=gemini-2.0-flash
+FAST_LLM_API_KEY=your_gemini_api_key_here
+
+REASONING_LLM_PROVIDER=claude # 'claude' | 'openai' | 'gemini'
+REASONING_LLM_MODEL=claude-3-5-sonnet-20241022
+REASONING_LLM_API_KEY=your_anthropic_api_key_here
+
+# Embedding API
+EMBEDDING_API_KEY=your_openai_or_gemini_key_here
+
+# Web Search Grounding Tool
+TAVILY_API_KEY=your_tavily_api_key_here
+```
+
+================================================================================
+9. VERIFICATION, TEST SCENARIOS & DEPLOYMENT CHECKLIST
+================================================================================
+
+1. Verification Test: Topic Ingestion & Persona Synthesis
+   - Submit: *"Migrate our monolithic Rails e-commerce system to microservices on AWS EKS."*
+   - Verify: System spawns Principal Cloud Architect (Advocate) vs Head of Site Reliability (Skeptic) with conflicting KPIs.
+
+2. Verification Test: Document Grounding & RAG
+   - Upload a 5-page PDF with custom company budget constraints.
+   - Verify: Agent B cites page numbers and dollar caps directly from the document during the Evidence phase.
+
+3. Verification Test: Real-Time Fallacy Interception
+   - Simulate an agent response containing an Ad Hominem or Slippery Slope.
+   - Verify: The Referee node triggers `event: fallacy_alert` within 300ms, displaying a warning badge on the UI.
+
+4. Verification Test: Human-in-the-Loop Steering
+   - Submit interjection: *"We cannot increase our cloud spend by more than 15%."*
+   - Verify: The next agent immediately adjusts the debate strategy to address the financial ceiling.
+
+5. Verification Test: Final Decision Memo
+   - Let the debate reach the round limit.
+   - Verify: Frontier Judge generates the rubric matrix, identifies concessions and unresolved risks, and exports a formatted PDF.
+
+================================================================================
+END OF MASTER SPECIFICATION PROMPT
+================================================================================
