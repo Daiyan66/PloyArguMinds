@@ -2,23 +2,34 @@
 
 > **Autonomous Dialectic Stress-Testing Engine & Executive Decision Arbiter**
 
-PolyArguMinds is a mission-critical platform where founders, executives, engineers, and researchers submit proposals, architecture designs, or contentious policy decisions to watch a committee of specialized, grounded AI agents red-team the idea and produce a derisked **Executive Decision Memorandum**.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js 15](https://img.shields.io/badge/Next.js-15.1+-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Cyclic_Agents-blue)](https://langchain-ai.github.io/langgraph/)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-Llama_3.3_70B-purple)](https://openrouter.ai)
+[![MongoDB Atlas](https://img.shields.io/badge/MongoDB-Atlas_Sync-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+PolyArguMinds is an executive-grade dialectic reasoning platform where founders, executives, engineers, and researchers stress-test technical proposals, architectural trade-offs, or contentious corporate policies. A committee of specialized, grounded AI agents red-teams the topic and generates a formal, derisked **Executive Decision Memorandum**.
 
 ---
 
 ## 🌟 Key Features
 
-- **Dynamic Persona Synthesizer**: Analyzes topic tension (e.g. Velocity vs Resilience, CapEx vs Capital Efficiency) and dynamically spawns specialized domain experts with opposing worldviews.
-- **Phased Argumentation Guidance**: Structured multi-turn dialectic cycling through Foundation (definition & boundaries), Evidence (empirical grounding & data), and Clash (direct rebuttal & deconstruction).
+- **Dual Dialectic Postures**:
+  - **Red-Team Stress-Test (`DEBATE`)**: Adversarial friction between a Lead Advocate and Chief Skeptic to uncover edge-cases, cost hazards, and unverified assumptions.
+  - **Collaborative Review (`COLLABORATIVE`)**: Constructive architectural analysis between a Lead Strategist and Principal Reviewer seeking synergy and consensus.
+- **Dynamic Persona Synthesizer**: Analyzes topic friction (e.g. Velocity vs Resilience, CapEx vs Capital Efficiency) and dynamically spawns specialized domain experts with opposing worldviews.
+- **Custom Argumentation Depth**: Tune debate intensity anywhere from **1 to 10 rounds** (2 to 20 turns) with continuous sliding adjustment.
+- **Phased Guidance**: Multi-turn dialectic cycling through **Foundation** (boundary definitions), **Evidence** (empirical metrics & data), and **Clash** (rebuttal & deconstruction).
 - **Real-Time Logician Referee**: Evaluates turns asynchronously for informal fallacies (*Strawman, Ad Hominem, False Dichotomy, Slippery Slope, Circular Reasoning*).
-- **RAG & Grounding**: Upload PRDs, technical RFCs, or budgets (PDF/TXT). Agents cite specific page numbers, clauses, and empirical data points.
-- **Human-in-the-Loop Steering Bar**: Inject hard constraints into the live state graph mid-debate (e.g. *"Must cap budget increase at 10%"*).
-- **Frontier Chief Adjudicator**: Delivers a formal Decision Memo with a multi-rubric evaluation matrix, key concessions, unresolved blind spots, and an exportable PDF.
+- **RAG & Grounding**: Upload PRDs, RFCs, or budgets (PDF/TXT). Agents cite specific page numbers, clauses, and empirical data points.
+- **Human-in-the-Loop Steering Bar**: Inject hard constraints into the live state graph mid-debate (e.g. *"Must cap cloud budget increase at 10%"*).
+- **Executive Decision Report (PDF Export)**: Multi-rubric scorecard matrix, round-by-round argument breakdown, key concessions, unresolved blind spots, and an exportable formal PDF.
 - **Server-Sent Events (SSE)**: Character-paced token streaming with sub-100ms latency.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Multi-Agent Architecture
 
 ```text
                ┌─────────────────────────────────────────┐
@@ -62,26 +73,21 @@ PolyArguMinds is a mission-critical platform where founders, executives, enginee
 
 ## 🚀 Quickstart
 
-### Option A: Run Locally (Zero Setup)
+### Option A: Local Dev (Zero Setup)
 
 #### 1. Backend (FastAPI + LangGraph)
 ```bash
-# Activate virtual environment
-.\venv\Scripts\activate   # Windows
-# or: source venv/bin/activate # Linux/Mac
-
-# Run server
-cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Run server directly from project root
+.\venv\Scripts\python run_backend.py
 ```
+*API running at `http://127.0.0.1:8000` (Interactive Swagger Docs at `/docs`)*
 
 #### 2. Frontend (Next.js 15 + React 19 + Tailwind)
 ```bash
 cd frontend
 npm run dev
 ```
-
-Visit [http://localhost:3000](http://localhost:3000) in your browser.
+*UI running at `http://localhost:3000`*
 
 ---
 
@@ -106,12 +112,18 @@ Run backend tests:
 
 ## ⚙️ Configuration (.env)
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `DATABASE_URL` | SQLAlchemy Async connection string | `sqlite+aiosqlite:///./polyarguminds.db` |
-| `FAST_LLM_PROVIDER` | Debater & Referee LLM provider | `gemini` (or `openai`, `anthropic`, `mock`) |
-| `REASONING_LLM_PROVIDER`| Frontier Chief Adjudicator provider | `gemini` (or `claude`, `openai`, `mock`) |
-| `GEMINI_API_KEY` | Google Gemini API Key | Optional |
-| `OPENAI_API_KEY` | OpenAI API Key | Optional |
-| `ANTHROPIC_API_KEY` | Anthropic Claude API Key | Optional |
-| `TAVILY_API_KEY` | Web search grounding tool | Optional |
+Copy `.env.example` to `.env` to configure your environment:
+
+```ini
+# Database & Cache (SQLite local, PostgreSQL + pgvector, or MongoDB Atlas)
+DATABASE_URL=sqlite+aiosqlite:///./polyarguminds.db
+MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/
+
+# LLM Inference (OpenRouter, Gemini, OpenAI, Claude)
+OPENROUTER_API_KEY=your_key_here
+FAST_LLM_MODEL=meta-llama/llama-3.3-70b-instruct
+REASONING_LLM_MODEL=meta-llama/llama-3.3-70b-instruct
+
+# Frontend
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```

@@ -16,7 +16,7 @@ interface DebateStore {
   isFinished: boolean;
   statusMessage: string | null;
 
-  setSessionId: (id: string) => void;
+  setSessionId: (id: string | null) => void;
   setTopic: (topic: string) => void;
   setPersonas: (personas: Persona[]) => void;
   setTurns: (turns: MessageTurn[]) => void;
@@ -50,7 +50,14 @@ export const useDebateStore = create<DebateStore>((set) => ({
   setTopic: (topic) => set({ topic }),
   setPersonas: (personas) => set({ personas }),
   setTurns: (turns) => set({ turns }),
-  appendTurn: (turn) => set((state) => ({ turns: [...state.turns, turn] })),
+  appendTurn: (turn) =>
+    set((state) => {
+      // Deduplicate turns by ID to prevent repeating/concatenating entries
+      if (state.turns.some((t) => t.id === turn.id)) {
+        return state;
+      }
+      return { turns: [...state.turns, turn] };
+    }),
   setActiveSpeaker: (id, name = null) => set({ activeSpeakerId: id, activeSpeakerName: name }),
   setCurrentStreamedText: (updater) =>
     set((state) => ({

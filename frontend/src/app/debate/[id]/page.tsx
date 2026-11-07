@@ -33,7 +33,7 @@ export default function DebateArenaPage() {
     totalRounds
   } = useDebateStream(sessionId);
 
-  const { updateRound } = useDebateStore();
+  const { updateRound, setPersonas, setTurns, setVerdict } = useDebateStore();
 
   useEffect(() => {
     if (!sessionId) return;
@@ -42,11 +42,22 @@ export default function DebateArenaPage() {
         setTopic(data.topic);
         if (data.mode) setMode(data.mode);
         updateRound(data.current_round, data.total_rounds);
+        if (data.personas && data.personas.length > 0) {
+          setPersonas(data.personas);
+        }
+        if (data.turns && data.turns.length > 0) {
+          setTurns(data.turns);
+        }
         if (data.verdict) {
+          setVerdict(data.verdict);
           setShowMemoModal(true);
         }
       })
       .catch((err) => console.log('Could not load session', err));
+
+    return () => {
+      useDebateStore.getState().reset();
+    };
   }, [sessionId]);
 
   useEffect(() => {
@@ -99,11 +110,13 @@ export default function DebateArenaPage() {
                       ? 'text-purple-300 bg-purple-950/60 border-purple-800'
                       : 'text-emerald-400 bg-emerald-950/60 border-emerald-800'
                   }`}>
-                    {agentA.bias_direction || (isCollab ? 'CAPABILITY' : 'FOR')}
+                    {agentA.bias_direction}
                   </span>
                 </div>
-                <h3 className="text-sm font-semibold text-white">{agentA.name}</h3>
-                <p className="text-xs text-slate-400">{agentA.role_title}</p>
+                <h4 className="text-sm font-semibold text-white">{agentA.name}</h4>
+                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                  {agentA.core_worldview}
+                </p>
               </div>
             )}
 
@@ -111,62 +124,67 @@ export default function DebateArenaPage() {
               <div
                 className={`p-3.5 rounded-xl border transition ${
                   activeSpeakerId === 'agent_b'
-                    ? isCollab
-                      ? 'bg-purple-950/30 border-purple-500 shadow-md ring-1 ring-purple-500/50'
-                      : 'bg-rose-950/30 border-rose-500 shadow-md ring-1 ring-rose-500/50'
+                    ? 'bg-rose-950/40 border-rose-500 shadow-md ring-1 ring-rose-500/50'
                     : 'bg-slate-900/60 border-slate-800'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs font-bold ${isCollab ? 'text-purple-400' : 'text-rose-400'}`}>
+                  <span className="text-xs font-bold text-rose-400">
                     {isCollab ? 'Principal Reviewer' : 'Chief Skeptic'}
                   </span>
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
                     isCollab
-                      ? 'text-purple-300 bg-purple-950/60 border-purple-800'
+                      ? 'text-sky-300 bg-sky-950/60 border-sky-800'
                       : 'text-rose-400 bg-rose-950/60 border-rose-800'
                   }`}>
-                    {agentB.bias_direction || (isCollab ? 'GOVERNANCE' : 'AGAINST')}
+                    {agentB.bias_direction}
                   </span>
                 </div>
-                <h3 className="text-sm font-semibold text-white">{agentB.name}</h3>
-                <p className="text-xs text-slate-400">{agentB.role_title}</p>
+                <h4 className="text-sm font-semibold text-white">{agentB.name}</h4>
+                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                  {agentB.core_worldview}
+                </p>
               </div>
             )}
           </div>
         )}
 
-        {/* Dialectic Transcript */}
-        <div className="space-y-4">
-          {turns.length === 0 && !currentStreamedText && (
-            <div className="py-20 text-center text-slate-500 flex flex-col items-center justify-center">
-              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 text-indigo-400">
-                <MessageSquare size={20} />
-              </div>
-              <p className="text-sm font-medium text-slate-300">
-                Initializing {isCollab ? 'Collaborative Review' : 'Red-Team Dialectic'}
-              </p>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                Synthesizing expert personas and framing {isCollab ? 'constructive design trade-offs' : 'adversarial boundary conditions'}...
-              </p>
+        {/* Empty State / Initial Loading */}
+        {turns.length === 0 && !activeSpeakerId && (
+          <div className="text-center py-20">
+            <div className="inline-flex p-3 rounded-full bg-slate-900 border border-slate-800 mb-4 animate-pulse">
+              <MessageSquare className="text-indigo-400" size={24} />
             </div>
-          )}
+            <h3 className="text-base font-semibold text-white mb-1">Initializing Dialectic Analysis</h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              Synthesizing domain expert personas and framing rigorous logical boundaries...
+            </p>
+          </div>
+        )}
 
-          {/* Completed Turns */}
-          {turns.map((t) => {
-            const persona = personas.find((p) => p.identifier === t.speaker_id);
-            return <AgentBubble key={t.id} turn={t} persona={persona} mode={mode} />;
+        {/* Turns Stream List */}
+        <div className="space-y-6">
+          {turns.map((turn) => {
+            const persona = personas.find((p) => p.identifier === turn.speaker_id);
+            return (
+              <AgentBubble
+                key={turn.id}
+                turn={turn}
+                persona={persona}
+                mode={mode}
+              />
+            );
           })}
 
-          {/* Currently Streaming Turn */}
-          {activeSpeakerId && currentStreamedText && (
+          {/* Active Streaming Turn */}
+          {activeSpeakerId && (
             <AgentBubble
               streaming={{
                 speakerId: activeSpeakerId,
                 senderName: activeSpeakerName || 'Debater',
                 content: currentStreamedText
               }}
-              persona={personas.find((p) => p.identifier === activeSpeakerId)}
+              persona={activeSpeakerId === 'agent_a' ? agentA : agentB}
               mode={mode}
             />
           )}
@@ -175,7 +193,7 @@ export default function DebateArenaPage() {
         </div>
       </main>
 
-      {/* Steering Input Bar */}
+      {/* Floating Bottom Steering Bar */}
       <InterjectBar sessionId={sessionId} disabled={isFinished} />
 
       {/* Executive Decision Memo Modal */}

@@ -15,6 +15,7 @@ import {
   FileText
 } from 'lucide-react';
 import { createSession, uploadDocument } from '../lib/api';
+import { useDebateStore } from '../stores/debateStore';
 
 const PRESET_TOPICS = [
   "Enforce a mandatory 3-day in-office RTO mandate across all engineering teams.",
@@ -45,6 +46,7 @@ export default function HomePage() {
 
     setIsSubmitting(true);
     try {
+      useDebateStore.getState().reset();
       const sess = await createSession(topic.trim(), mode, totalRounds);
       if (file) {
         await uploadDocument(sess.id, file);
@@ -309,7 +311,10 @@ export default function HomePage() {
                   {recentSessions.map((s) => (
                     <div
                       key={s.id}
-                      onClick={() => router.push(`/debate/${s.id}`)}
+                      onClick={() => {
+                        useDebateStore.getState().reset();
+                        router.push(`/debate/${s.id}`);
+                      }}
                       className="p-3.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-slate-800/90 hover:border-slate-700 cursor-pointer transition flex items-center justify-between text-xs group"
                     >
                       <div className="min-w-0 pr-3">

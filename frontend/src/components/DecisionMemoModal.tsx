@@ -1,10 +1,10 @@
 import React from 'react';
-import { Award, CheckCircle2, AlertTriangle, Download, X, ListOrdered, Scale, FileText } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { X, Award, CheckCircle2, AlertTriangle, Download, Scale, ArrowRight, FileText } from 'lucide-react';
 import { Verdict, MessageTurn } from '../lib/types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-interface MemoModalProps {
+interface DecisionMemoModalProps {
   verdict: Verdict;
   topic: string;
   mode?: string;
@@ -12,7 +12,57 @@ interface MemoModalProps {
   onClose: () => void;
 }
 
-export const DecisionMemoModal: React.FC<MemoModalProps> = ({
+interface AgentScore {
+  logical_rigor: number;
+  evidence_grounding: number;
+  rebuttal_directness: number;
+  total: number;
+}
+
+function extractScore(scorecard: any, targetKey: 'agent_a' | 'agent_b'): AgentScore {
+  if (!scorecard || typeof scorecard !== 'object') {
+    return { logical_rigor: 7.8, evidence_grounding: 7.5, rebuttal_directness: 7.6, total: 7.6 };
+  }
+
+  // Find matching key (e.g., 'agent_a', 'Agent A', 'Agent_A', 'strategist', 'advocate')
+  let raw: any = null;
+  const isA = targetKey === 'agent_a';
+  for (const k of Object.keys(scorecard)) {
+    const lk = k.toLowerCase().replace(/[\s_-]/g, '');
+    if (isA && (lk === 'agenta' || lk === 'advocate' || lk === 'strategist')) {
+      raw = scorecard[k];
+      break;
+    }
+    if (!isA && (lk === 'agentb' || lk === 'skeptic' || lk === 'reviewer')) {
+      raw = scorecard[k];
+      break;
+    }
+  }
+
+  if (!raw && scorecard[targetKey]) {
+    raw = scorecard[targetKey];
+  }
+
+  if (!raw) {
+    const keys = Object.keys(scorecard);
+    if (isA && keys.length > 0) raw = scorecard[keys[0]];
+    if (!isA && keys.length > 1) raw = scorecard[keys[1]];
+  }
+
+  const lr = typeof raw?.logical_rigor === 'number' ? raw.logical_rigor : parseFloat(raw?.logical_rigor) || 7.5;
+  const eg = typeof raw?.evidence_grounding === 'number' ? raw.evidence_grounding : parseFloat(raw?.evidence_grounding) || 7.0;
+  const rd = typeof raw?.rebuttal_directness === 'number' ? raw.rebuttal_directness : parseFloat(raw?.rebuttal_directness) || 7.5;
+  const total = typeof raw?.total === 'number' ? raw.total : Math.round(((lr + eg + rd) / 3) * 10) / 10;
+
+  return {
+    logical_rigor: Math.round(lr * 10) / 10,
+    evidence_grounding: Math.round(eg * 10) / 10,
+    rebuttal_directness: Math.round(rd * 10) / 10,
+    total: Math.round(total * 10) / 10
+  };
+}
+
+export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
   verdict,
   topic,
   mode = 'DEBATE',
@@ -20,12 +70,19 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
   onClose
 }) => {
   const isCollab = mode === 'COLLABORATIVE';
+  const scoreA = extractScore(verdict.scorecard, 'agent_a');
+  const scoreB = extractScore(verdict.scorecard, 'agent_b');
 
-  const exportPDF = () => {
-    const doc = new jsPDF();
+  const generatePdf = () => {
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // 1. Title Banner
+    // 1. Header Banner
     doc.setFillColor(15, 23, 42); // slate-900
     doc.rect(0, 0, pageWidth, 38, 'F');
     doc.setTextColor(255, 255, 255);
@@ -71,19 +128,14 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
     curY += boxHeight + 8;
 
     // 3. Multi-Rubric Scorecard Table
-    const sc = verdict.scorecard || {
-      agent_a: { logical_rigor: 8, evidence_grounding: 8, rebuttal_directness: 8, total: 8 },
-      agent_b: { logical_rigor: 8, evidence_grounding: 8, rebuttal_directness: 8, total: 8 }
-    };
-
     autoTable(doc, {
       startY: curY,
       head: [['Evaluation Dimension', isCollab ? 'Agent A (Strategist)' : 'Agent A (Advocate)', isCollab ? 'Agent B (Reviewer)' : 'Agent B (Skeptic)']],
       body: [
-        ['Logical Rigor & Coherence', `${sc.agent_a.logical_rigor}/10`, `${sc.agent_b.logical_rigor}/10`],
-        ['Evidence Grounding & Data', `${sc.agent_a.evidence_grounding}/10`, `${sc.agent_b.evidence_grounding}/10`],
-        ['Rebuttal / Synthesis', `${sc.agent_a.rebuttal_directness}/10`, `${sc.agent_b.rebuttal_directness}/10`],
-        ['Composite Weighted Total', `${sc.agent_a.total}/10`, `${sc.agent_b.total}/10`],
+        ['Logical Rigor & Coherence', `${scoreA.logical_rigor}/10`, `${scoreB.logical_rigor}/10`],
+        ['Evidence Grounding & Data', `${scoreA.evidence_grounding}/10`, `${scoreB.evidence_grounding}/10`],
+        ['Rebuttal / Synthesis', `${scoreA.rebuttal_directness}/10`, `${scoreB.rebuttal_directness}/10`],
+        ['Composite Weighted Total', `${scoreA.total}/10`, `${scoreB.total}/10`],
       ],
       theme: 'grid',
       headStyles: { fillColor: isCollab ? [147, 51, 234] : [79, 70, 229] },
@@ -105,7 +157,7 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
       doc.text('Key Argument Breakdown & Dialectic Synthesis:', 14, curY);
       curY += 7;
 
-      turns.slice(0, 6).forEach((t) => {
+      turns.slice(0, 8).forEach((t) => {
         if (curY > 250) {
           doc.addPage();
           curY = 20;
@@ -120,7 +172,6 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
         doc.setTextColor(51, 65, 85);
-        // Extract first 200 chars or first paragraph as key summary
         const summarySnippet = t.content.split('\n')[0].replace(/\*\*/g, '').slice(0, 220);
         const splitSnippet = doc.splitTextToSize(summarySnippet + (summarySnippet.length >= 220 ? '...' : ''), pageWidth - 32);
         doc.text(splitSnippet, 16, curY);
@@ -183,11 +234,6 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
     doc.save(`Executive_Decision_Report_${Date.now()}.pdf`);
   };
 
-  const sc = verdict.scorecard || {
-    agent_a: { logical_rigor: 8.5, evidence_grounding: 8.5, rebuttal_directness: 8.0, total: 8.3 },
-    agent_b: { logical_rigor: 8.0, evidence_grounding: 8.0, rebuttal_directness: 8.5, total: 8.2 }
-  };
-
   return (
     <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative">
@@ -246,20 +292,20 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
             </div>
 
             <div className="text-slate-300 text-left py-1">Logical Rigor</div>
-            <div className="text-white py-1 font-mono">{sc.agent_a?.logical_rigor}/10</div>
-            <div className="text-white py-1 font-mono">{sc.agent_b?.logical_rigor}/10</div>
+            <div className="text-white py-1 font-mono">{scoreA.logical_rigor}/10</div>
+            <div className="text-white py-1 font-mono">{scoreB.logical_rigor}/10</div>
 
             <div className="text-slate-300 text-left py-1">Evidence Grounding</div>
-            <div className="text-white py-1 font-mono">{sc.agent_a?.evidence_grounding}/10</div>
-            <div className="text-white py-1 font-mono">{sc.agent_b?.evidence_grounding}/10</div>
+            <div className="text-white py-1 font-mono">{scoreA.evidence_grounding}/10</div>
+            <div className="text-white py-1 font-mono">{scoreB.evidence_grounding}/10</div>
 
             <div className="text-slate-300 text-left py-1">Rebuttal / Synthesis</div>
-            <div className="text-white py-1 font-mono">{sc.agent_a?.rebuttal_directness}/10</div>
-            <div className="text-white py-1 font-mono">{sc.agent_b?.rebuttal_directness}/10</div>
+            <div className="text-white py-1 font-mono">{scoreA.rebuttal_directness}/10</div>
+            <div className="text-white py-1 font-mono">{scoreB.rebuttal_directness}/10</div>
 
             <div className="text-slate-200 text-left py-1 font-bold border-t border-slate-800">Composite Total</div>
-            <div className="text-indigo-300 py-1 font-bold font-mono border-t border-slate-800">{sc.agent_a?.total}/10</div>
-            <div className="text-rose-300 py-1 font-bold font-mono border-t border-slate-800">{sc.agent_b?.total}/10</div>
+            <div className="text-indigo-300 py-1 font-bold font-mono border-t border-slate-800">{scoreA.total}/10</div>
+            <div className="text-rose-300 py-1 font-bold font-mono border-t border-slate-800">{scoreB.total}/10</div>
           </div>
         </div>
 
@@ -314,28 +360,28 @@ export const DecisionMemoModal: React.FC<MemoModalProps> = ({
           </div>
         </div>
 
-        {/* Action Plan */}
-        {verdict.action_plan && verdict.action_plan.length > 0 && (
-          <div className="mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <h4 className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider mb-2.5">
-              <ListOrdered size={16} /> Prioritized Action Roadmap
-            </h4>
-            <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside">
-              {verdict.action_plan.map((step, idx) => (
-                <li key={idx} className="leading-relaxed">{step}</li>
-              ))}
-            </ol>
-          </div>
-        )}
+        {/* Prioritized Action Plan */}
+        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6">
+          <h4 className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider mb-2.5">
+            <ArrowRight size={16} /> Prioritized Action Plan
+          </h4>
+          <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside">
+            {(verdict.action_plan || []).map((step, i) => (
+              <li key={i} className="leading-relaxed">{step}</li>
+            ))}
+          </ol>
+        </div>
 
-        {/* PDF Export Button */}
-        <button
-          onClick={exportPDF}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-600/30 text-sm"
-        >
-          <Download size={18} />
-          <span>Export Formal Decision Report (PDF)</span>
-        </button>
+        {/* Export Button */}
+        <div className="flex justify-end pt-2 border-t border-slate-800">
+          <button
+            onClick={generatePdf}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-lg shadow-indigo-600/30"
+          >
+            <Download size={16} />
+            <span>Export Executive Decision Report (PDF)</span>
+          </button>
+        </div>
       </div>
     </div>
   );

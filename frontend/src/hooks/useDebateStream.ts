@@ -33,6 +33,10 @@ export function useDebateStream(sessionId: string) {
   useEffect(() => {
     if (!sessionId) return;
 
+    // Reset Zustand store state for new session ID to prevent old chats concatenating
+    useDebateStore.getState().reset();
+    useDebateStore.getState().setSessionId(sessionId);
+
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
     const streamUrl = `${apiBase}/api/sessions/${sessionId}/stream`;
     console.log('Connecting to SSE stream:', streamUrl);
@@ -113,9 +117,11 @@ export function useDebateStream(sessionId: string) {
         const finalContent = accumulatedTextRef.current;
 
         if (speaker && finalContent.trim()) {
-          const matchingPersona = personas.find((p) => p.identifier === speaker.id);
+          // Always look up against fresh store personas to avoid stale closures
+          const currentPersonas = useDebateStore.getState().personas;
+          const matchingPersona = currentPersonas.find((p) => p.identifier === speaker.id);
           const newTurn: MessageTurn = {
-            id: data.turn_id || Math.random().toString(),
+            id: data.turn_id || `${speaker.id}_r${speaker.round}_${Date.now()}`,
             speaker_id: speaker.id,
             sender_name: speaker.name,
             role_title: matchingPersona ? matchingPersona.role_title : (speaker.id === 'moderator' ? 'Human Moderator' : 'Debater'),

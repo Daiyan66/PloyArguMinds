@@ -58,58 +58,111 @@ class MockLLM:
             return MockAIMessage(content)
 
         elif "Chief Adjudicator and Senior Strategic Decision Arbiter" in prompt_text:
+            # Generate dynamic scores derived from prompt length and topic
+            score_seed = (len(prompt_text) % 17) / 10.0
+            score_a_lr = round(min(9.5, max(6.5, 7.8 + score_seed * 0.4)), 1)
+            score_a_eg = round(min(9.5, max(6.5, 7.5 + score_seed * 0.3)), 1)
+            score_a_rd = round(min(9.5, max(6.5, 8.0 - score_seed * 0.2)), 1)
+            total_a = round((score_a_lr + score_a_eg + score_a_rd) / 3.0, 1)
+
+            score_b_lr = round(min(9.5, max(6.5, 7.4 - score_seed * 0.3)), 1)
+            score_b_eg = round(min(9.5, max(6.5, 7.8 + score_seed * 0.2)), 1)
+            score_b_rd = round(min(9.5, max(6.5, 7.5 + score_seed * 0.3)), 1)
+            total_b = round((score_b_lr + score_b_eg + score_b_rd) / 3.0, 1)
+            
+            winner = "agent_a" if total_a > total_b else ("agent_b" if total_b > total_a else "TIE")
+
             content = json.dumps({
-                "winner_identifier": "agent_a",
+                "winner_identifier": winner,
                 "scorecard": {
                     "agent_a": {
-                        "logical_rigor": 8.8,
-                        "evidence_grounding": 8.5,
-                        "rebuttal_directness": 8.9,
-                        "total": 8.7
+                        "logical_rigor": score_a_lr,
+                        "evidence_grounding": score_a_eg,
+                        "rebuttal_directness": score_a_rd,
+                        "total": total_a
                     },
                     "agent_b": {
-                        "logical_rigor": 8.4,
-                        "evidence_grounding": 8.6,
-                        "rebuttal_directness": 8.2,
-                        "total": 8.4
+                        "logical_rigor": score_b_lr,
+                        "evidence_grounding": score_b_eg,
+                        "rebuttal_directness": score_b_rd,
+                        "total": total_b
                     }
                 },
                 "key_concessions": [
-                    "Agent A conceded that distributed transactional boundaries introduce non-trivial observability and debugging overhead.",
-                    "Agent B acknowledged that monolithic database lock contention currently limits peak quarterly scaling."
+                    "Both sides acknowledged that initial migration friction and team ramp-up introduce operational overhead.",
+                    "Skeptic accepted that long-term resilience and determinism outweigh initial baseline tooling costs."
                 ],
                 "unresolved_risks": [
-                    "Data migration synchronization strategy for legacy multi-tenant schemas remains unquantified.",
-                    "Team upskilling curve and initial velocity deceleration over the first two quarters."
+                    "Production telemetry and observability tooling during the phased rollout period.",
+                    "Potential delivery delay during the first two transition quarters."
                 ],
-                "executive_recommendation": "PROCEED WITH CONDITIONAL STAGED PILOT: Decouple read-heavy reporting services first before decomposing core transactional writes.",
+                "executive_recommendation": f"PROCEED WITH CONTROLLED STAGED ROLLOUT: Implement a targeted 90-day pilot focusing on non-critical service paths before wider adoption.",
                 "action_plan": [
-                    "Form a cross-functional Platform Enablement squad to establish CI/CD canary automation.",
-                    "Establish strict latency and budget SLAs (hard cap of 12% cloud budget expansion).",
-                    "Conduct a two-week proof-of-concept on the isolated notification microservice."
+                    "Establish clear baseline operational metrics and SLAs prior to initiating changes.",
+                    "Deploy automated canary validation pipelines to catch regression early.",
+                    "Review pilot outcomes at the 60-day milestone with leadership stakeholders."
                 ]
             })
             return MockAIMessage(content)
 
         else:
-            # Standard debater turn
+            # Dynamic debater turn extracting topic and role
+            topic_hint = "this proposal"
+            if "TOPIC:" in prompt_text:
+                try:
+                    topic_hint = prompt_text.split("TOPIC:")[1].split("\n")[0].strip()
+                except Exception:
+                    pass
+
+            is_agent_b = "agent_b" in prompt_text or "Marcus" in prompt_text or "AGAINST" in prompt_text or "Reviewer" in prompt_text
+
             if "PHASE: FOUNDATION" in prompt_text:
-                content = (
-                    "To establish our foundational premise: our strategic imperative requires decoupling monolithic bottlenecks. "
-                    "By adopting an event-driven, domain-isolated microservices topology, we isolate critical failure domains and enable independent deployment cycles. "
-                    "Empirical industry benchmarks demonstrate a 3x increase in team deployment velocity once domain boundaries are solidified."
-                )
+                if not is_agent_b:
+                    content = (
+                        f"**Core Stance:** We strongly advocate for moving forward with: {topic_hint}. "
+                        "Establishing high velocity and modern foundational standards is essential to maintain competitive advantage.\n\n"
+                        "**Key Argument & Evidence:** By modernizing our posture now, empirical industry benchmarks demonstrate a 25-35% reduction in long-term incident resolution times and higher developer satisfaction.\n\n"
+                        "**Rebuttal / Scrutiny:** Concerns regarding transition disruption are valid but can be mitigated through disciplined phased scheduling.\n\n"
+                        "**Bottom Line:** Leadership should endorse this initiative with clear milestones to maintain strategic agility."
+                    )
+                else:
+                    content = (
+                        f"**Core Stance:** We urge rigorous prudence regarding: {topic_hint}. "
+                        "Stability, financial discipline, and operational risk containment must take precedence over unproven changes.\n\n"
+                        "**Key Argument & Evidence:** Operational history shows that 60% of rapid architectural shifts exceed initial cost budgets by at least 2x and introduce unforeseen edge-case failure modes.\n\n"
+                        "**Rebuttal / Scrutiny:** Theoretical velocity gains are illusory if production downtime or customer attrition spikes during the transition.\n\n"
+                        "**Bottom Line:** We must mandate strict financial and latency guardrails before committing capital or engineering hours."
+                    )
             elif "PHASE: EVIDENCE" in prompt_text:
-                content = (
-                    "Examining empirical operating parameters: our transaction latency percentiles (p99) on the primary monolith spike to 850ms during peak load. "
-                    "Decoupling into isolated services with read-replicas reduces p99 latency to under 90ms. "
-                    "Furthermore, fault isolation prevents non-critical background jobs from saturating checkout thread pools."
-                )
+                if not is_agent_b:
+                    content = (
+                        f"**Core Stance:** Concrete operational evidence demonstrates that {topic_hint} yields measurable ROI.\n\n"
+                        "**Key Argument & Evidence:** Benchmark testing across peer organizations shows p99 latency improvements of up to 40% and a 50% decrease in memory footprint.\n\n"
+                        "**Rebuttal / Scrutiny:** The governance team fears budget overruns, but cloud autoscaling and reduced CPU utilization directly drive operational cost downs.\n\n"
+                        "**Bottom Line:** The risk of inaction and technical stagnation is significantly greater than the managed cost of adoption."
+                    )
+                else:
+                    content = (
+                        f"**Core Stance:** The proposed benefits of {topic_hint} overlook critical hidden migration and licensing overhead.\n\n"
+                        "**Key Argument & Evidence:** Engineering ramp-up time typically reduces sprint delivery by 20% in the first two quarters, creating backlog debt.\n\n"
+                        "**Rebuttal / Scrutiny:** The advocate's benchmarks reflect idealized lab environments, not legacy production data with accumulated technical debt.\n\n"
+                        "**Bottom Line:** Require an isolated two-sprint proof of concept with strict exit criteria before enterprise-wide greenlighting."
+                    )
             else:
-                content = (
-                    "Directly addressing the financial critique: the initial infrastructural CapEx is outweighed by operational savings within 18 months. "
-                    "Moreover, container autoscaling allows us to scale compute elastically rather than provisioning for worst-case peak capacity 24/7."
-                )
+                if not is_agent_b:
+                    content = (
+                        f"**Core Stance:** In conclusion, {topic_hint} is a strategic necessity that our team is fully equipped to execute.\n\n"
+                        "**Key Argument & Evidence:** We have validated that canary deployments and fallback toggles reduce rollout risk to near zero.\n\n"
+                        "**Rebuttal / Scrutiny:** We fully accept the requirement for budget caps and 90-day checkpoint reviews proposed by governance.\n\n"
+                        "**Bottom Line:** Approve the staged adoption plan with defined telemetry thresholds."
+                    )
+                else:
+                    content = (
+                        f"**Core Stance:** We conclude that {topic_hint} can only proceed under strict phased constraints and executive oversight.\n\n"
+                        "**Key Argument & Evidence:** A gated rollout ensuring zero customer impact is the only acceptable path to protect core SLAs.\n\n"
+                        "**Rebuttal / Scrutiny:** We concede that modernizing critical components is desirable once safety nets are verified in staging.\n\n"
+                        "**Bottom Line:** Greenlight a pilot phase only, conditional on hard spend limits and weekly review."
+                    )
             return MockAIMessage(content)
 
 
