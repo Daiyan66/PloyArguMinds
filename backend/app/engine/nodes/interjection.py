@@ -13,7 +13,7 @@ async def apply_interjections_node(state: DebateState) -> DebateState:
             role_title="Human Moderator",
             round_number=state.current_round,
             phase="INTERJECTION",
-            content=f"⚠️ MODERATOR CONSTRAINT INJECTED: \"{interjection.content}\". Both participants must incorporate this requirement immediately.",
+            content=f"MODERATOR CONSTRAINT INJECTED: \"{interjection.content}\". Both participants must incorporate this requirement immediately.",
             citations=[],
             fallacies=[]
         )

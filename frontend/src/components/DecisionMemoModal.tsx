@@ -24,7 +24,6 @@ function extractScore(scorecard: any, targetKey: 'agent_a' | 'agent_b'): AgentSc
     return { logical_rigor: 7.8, evidence_grounding: 7.5, rebuttal_directness: 7.6, total: 7.6 };
   }
 
-  // Find matching key (e.g., 'agent_a', 'Agent A', 'Agent_A', 'strategist', 'advocate')
   let raw: any = null;
   const isA = targetKey === 'agent_a';
   for (const k of Object.keys(scorecard)) {
@@ -62,6 +61,58 @@ function extractScore(scorecard: any, targetKey: 'agent_a' | 'agent_b'): AgentSc
   };
 }
 
+// Clean all emojis and non-standard unicode that break jsPDF's built-in Helvetica font
+function cleanPdfText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/⚠️|🛡️|🚨|⚖️|💡|✅|❌|🎯|📌|👉|•/gu, '')
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[^\x20-\x7E\r\n\t]/g, ' ')
+    .replace(/ +/g, ' ')
+    .trim();
+}
+
+interface ParsedBlock {
+  heading: string;
+  body: string;
+}
+
+function parseTurnContent(content: string): ParsedBlock[] {
+  const cleaned = cleanPdfText(content);
+  if (!cleaned) return [];
+
+  const blocks: ParsedBlock[] = [];
+  const regex = /(?:\*\*|\b)(Core Stance(?:\s+on\s+[^:]+)?|Key Argument & Evidence|Rebuttal \/ Scrutiny|Bottom Line|Key Evidence|Rebuttal|Takeaway)(?:\*\*|\b)[:\s]*([\s\S]*?)(?=(?:\*\*|\b)(?:Core Stance|Key Argument & Evidence|Rebuttal \/ Scrutiny|Bottom Line|Key Evidence|Rebuttal|Takeaway)(?:\*\*|\b)[:\s]*|$)/gi;
+
+  let match;
+  let hasMatches = false;
+  while ((match = regex.exec(cleaned)) !== null) {
+    hasMatches = true;
+    const heading = match[1].replace(/\*\*/g, '').trim();
+    const body = match[2].replace(/\*\*/g, '').trim();
+    if (body) {
+      blocks.push({ heading, body });
+    }
+  }
+
+  if (!hasMatches || blocks.length === 0) {
+    const paras = cleaned.split(/\n\s*\n/).map((p) => p.replace(/\*\*/g, '').trim()).filter(Boolean);
+    paras.forEach((p, idx) => {
+      blocks.push({
+        heading: idx === 0 ? 'Core Stance' : idx === paras.length - 1 ? 'Bottom Line' : 'Key Argument',
+        body: p
+      });
+    });
+  }
+
+  return blocks;
+}
+
 export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
   verdict,
   topic,
@@ -81,155 +132,471 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 14;
+    const contentWidth = pageWidth - (margin * 2);
 
-    // 1. Header Banner
-    doc.setFillColor(15, 23, 42); // slate-900
-    doc.rect(0, 0, pageWidth, 38, 'F');
+    // ==========================================
+    // 1. Executive Top Header Banner (Page 1)
+    // ==========================================
+    doc.setFillColor(15, 23, 42); // Deep Navy Slate 900
+    doc.rect(0, 0, pageWidth, 36, 'F');
+
+    // Accent Stripe
+    if (isCollab) {
+      doc.setFillColor(147, 51, 234); // Purple 600
+    } else {
+      doc.setFillColor(79, 70, 229); // Indigo 600
+    }
+    doc.rect(0, 0, pageWidth, 3.5, 'F');
+
+    // Header Title
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text('EXECUTIVE DECISION & DIALECTIC REPORT', 14, 18);
-    
+    doc.setFontSize(15);
+    doc.text('POLYARGUMINDS EXECUTIVE REPORT', margin, 17);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184); // Slate 400
+    doc.text('AUTONOMOUS DIALECTIC STRESS-TEST & EXECUTIVE DECISION ARBITRATION', margin, 23);
+
+    // Meta badges on banner
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(226, 232, 240); // Slate 200
+    const modeLabel = isCollab ? 'MODE: COLLABORATIVE DESIGN REVIEW' : 'MODE: RED-TEAM STRESS-TEST';
+    doc.text(`${modeLabel}   |   DATE: ${new Date().toLocaleDateString()}   |   ROUNDS: ${verdict.scorecard ? 'EVALUATED' : 'CONCLUDED'}`, margin, 30);
+
+    let curY = 44;
+
+    // ==========================================
+    // 2. Assessed Topic Box
+    // ==========================================
+    doc.setFillColor(248, 250, 252); // Slate 50
+    doc.setDrawColor(203, 213, 225); // Slate 300
+    doc.setLineWidth(0.4);
+
+    const cleanTopic = cleanPdfText(topic);
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'bold');
+    const splitTopic = doc.splitTextToSize(cleanTopic, contentWidth - 10);
+    const topicBoxHeight = (splitTopic.length * 4.8) + 12;
+
+    doc.roundedRect(margin, curY, contentWidth, topicBoxHeight, 2.5, 2.5, 'FD');
+
+    // Topic Label
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 116, 139); // Slate 500
+    doc.text('STRATEGIC PROPOSAL ASSESSED:', margin + 5, curY + 6);
+
+    // Topic Content
+    doc.setFontSize(9.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42); // Slate 900
+    doc.text(splitTopic, margin + 5, curY + 12);
+
+    curY += topicBoxHeight + 6;
+
+    // ==========================================
+    // 3. Chief Adjudicator's Final Verdict Box
+    // ==========================================
+    const cleanRec = cleanPdfText(verdict.executive_recommendation);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text(`POLYARGUMINDS AUTONOMOUS ENGINE • MODE: ${mode.toUpperCase()} • DATE: ${new Date().toLocaleDateString()}`, 14, 28);
+    const splitRec = doc.splitTextToSize(cleanRec, contentWidth - 14);
+    const recBoxHeight = (splitRec.length * 4.5) + 14;
 
-    // 2. Topic & Executive Verdict
-    let curY = 48;
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(11);
+    // Box Fill & Border
+    if (isCollab) {
+      doc.setFillColor(250, 245, 255); // Purple 50
+      doc.setDrawColor(216, 180, 254); // Purple 300
+    } else {
+      doc.setFillColor(238, 242, 255); // Indigo 50
+      doc.setDrawColor(199, 210, 254); // Indigo 200
+    }
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, curY, contentWidth, recBoxHeight, 2.5, 2.5, 'FD');
+
+    // Left thick accent bar
+    if (isCollab) {
+      doc.setFillColor(147, 51, 234); // Purple 600
+    } else {
+      doc.setFillColor(79, 70, 229); // Indigo 600
+    }
+    doc.roundedRect(margin, curY, 3, recBoxHeight, 1.5, 1.5, 'F');
+
+    // Verdict Label
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
-    doc.text('Topic Assessed:', 14, curY);
-    curY += 6;
+    if (isCollab) {
+      doc.setTextColor(107, 33, 168); // Purple 800
+    } else {
+      doc.setTextColor(49, 46, 129); // Indigo 900
+    }
+    doc.text('CHIEF ARBITER STRATEGIC VERDICT & EXECUTIVE RECOMMENDATION:', margin + 7, curY + 6.5);
+
+    // Recommendation Text
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    const splitTopic = doc.splitTextToSize(topic, pageWidth - 28);
-    doc.text(splitTopic, 14, curY);
-    curY += (splitTopic.length * 5) + 6;
+    doc.setTextColor(30, 41, 59); // Slate 800
+    doc.text(splitRec, margin + 7, curY + 12.5);
 
-    // Highlighted Verdict Box
-    doc.setFillColor(238, 242, 255); // indigo-50
-    doc.setDrawColor(99, 102, 241); // indigo-500
-    doc.setLineWidth(0.5);
-    
-    const splitRec = doc.splitTextToSize(verdict.executive_recommendation, pageWidth - 36);
-    const boxHeight = (splitRec.length * 5) + 14;
-    doc.roundedRect(14, curY, pageWidth - 28, boxHeight, 3, 3, 'FD');
-    
-    doc.setTextColor(67, 56, 202); // indigo-700
-    doc.setFont('helvetica', 'bold');
+    curY += recBoxHeight + 8;
+
+    // ==========================================
+    // 4. Multi-Rubric Scorecard Table
+    // ==========================================
     doc.setFontSize(10);
-    doc.text('EXECUTIVE VERDICT & RECOMMENDATION:', 18, curY + 7);
-    
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.setFont('helvetica', 'normal');
-    doc.text(splitRec, 18, curY + 14);
-    curY += boxHeight + 8;
+    doc.text('Dialectic Evaluation Matrix & Rigor Scoring:', margin, curY);
+    curY += 3.5;
 
-    // 3. Multi-Rubric Scorecard Table
     autoTable(doc, {
       startY: curY,
-      head: [['Evaluation Dimension', isCollab ? 'Agent A (Strategist)' : 'Agent A (Advocate)', isCollab ? 'Agent B (Reviewer)' : 'Agent B (Skeptic)']],
+      head: [
+        [
+          'Evaluation Dimension',
+          isCollab ? 'Agent A (Lead Strategist)' : 'Agent A (Lead Advocate)',
+          isCollab ? 'Agent B (Principal Reviewer)' : 'Agent B (Chief Skeptic)'
+        ]
+      ],
       body: [
-        ['Logical Rigor & Coherence', `${scoreA.logical_rigor}/10`, `${scoreB.logical_rigor}/10`],
-        ['Evidence Grounding & Data', `${scoreA.evidence_grounding}/10`, `${scoreB.evidence_grounding}/10`],
-        ['Rebuttal / Synthesis', `${scoreA.rebuttal_directness}/10`, `${scoreB.rebuttal_directness}/10`],
-        ['Composite Weighted Total', `${scoreA.total}/10`, `${scoreB.total}/10`],
+        ['Logical Rigor & Coherence', `${scoreA.logical_rigor} / 10`, `${scoreB.logical_rigor} / 10`],
+        ['Evidence Grounding & Data', `${scoreA.evidence_grounding} / 10`, `${scoreB.evidence_grounding} / 10`],
+        ['Rebuttal Directness & Scrutiny', `${scoreA.rebuttal_directness} / 10`, `${scoreB.rebuttal_directness} / 10`],
+        ['Composite Weighted Total', `${scoreA.total} / 10`, `${scoreB.total} / 10`]
       ],
       theme: 'grid',
-      headStyles: { fillColor: isCollab ? [147, 51, 234] : [79, 70, 229] },
-      styles: { fontSize: 9 },
+      headStyles: {
+        fillColor: isCollab ? [126, 34, 206] : [49, 46, 129],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 8.5,
+        cellPadding: 3
+      },
+      bodyStyles: {
+        fontSize: 8.5,
+        textColor: [30, 41, 59],
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      didParseCell: (data) => {
+        // Highlight composite total row
+        if (data.row.index === 3) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = isCollab ? [243, 232, 255] : [224, 231, 255];
+        }
+      },
+      margin: { left: margin, right: margin }
     });
 
-    curY = (doc as any).lastAutoTable.finalY + 10;
+    curY = (doc as any).lastAutoTable.finalY + 8;
 
-    // 4. Key Argument Breakdown by Turn
+    // ==========================================
+    // 5. Key Argument Breakdown by Round (Cards)
+    // ==========================================
     if (turns.length > 0) {
       if (curY > 230) {
         doc.addPage();
-        curY = 20;
+        curY = 22;
       }
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(30, 41, 59);
-      doc.text('Key Argument Breakdown & Dialectic Synthesis:', 14, curY);
-      curY += 7;
+      doc.setFontSize(10.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Key Argument Breakdown & Dialectic Synthesis Across Rounds:', margin, curY);
+      curY += 6;
 
-      turns.slice(0, 8).forEach((t) => {
-        if (curY > 250) {
-          doc.addPage();
-          curY = 20;
+      turns.forEach((t) => {
+        const isMod = t.speaker_id === 'moderator';
+        const isAgentA = t.speaker_id === 'agent_a';
+        const rawContent = cleanPdfText(t.content);
+
+        // Header info
+        const roundLabel = `Round ${t.round_number}`;
+        const phaseLabel = cleanPdfText(t.phase || (isMod ? 'Human Constraint' : 'Dialectic Turn'));
+        const senderName = cleanPdfText(t.sender_name || (isMod ? 'Moderator' : 'Debater'));
+        const roleTitle = cleanPdfText(t.role_title || (isMod ? 'Human Moderator' : 'Expert'));
+
+        if (isMod) {
+          // MODERATOR DIRECTIVE CARD
+          const cleanConstraint = rawContent.replace(/^MODERATOR CONSTRAINT INJECTED:\s*/i, '').replace(/\.\s*Both participants must incorporate.*$/i, '');
+          const splitMod = doc.splitTextToSize(`"${cleanConstraint}"`, contentWidth - 14);
+          const modHeight = (splitMod.length * 4.3) + 14;
+
+          if (curY + modHeight > 270) {
+            doc.addPage();
+            curY = 22;
+          }
+
+          doc.setFillColor(254, 252, 232); // Amber 50
+          doc.setDrawColor(245, 158, 11); // Amber 500
+          doc.setLineWidth(0.4);
+          doc.roundedRect(margin, curY, contentWidth, modHeight, 2, 2, 'FD');
+
+          // Amber left bar
+          doc.setFillColor(217, 119, 6); // Amber 600
+          doc.roundedRect(margin, curY, 2.5, modHeight, 1, 1, 'F');
+
+          // Header
+          doc.setFontSize(7.5);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(180, 83, 9); // Amber 700
+          doc.text(`[${roundLabel.toUpperCase()} • MODERATOR STRATEGIC DIRECTIVE INJECTED]`, margin + 6, curY + 5.5);
+
+          doc.setFontSize(8.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(69, 26, 3); // Amber 950
+          doc.text(splitMod, margin + 6, curY + 10.5);
+
+          curY += modHeight + 5;
+        } else {
+          // DEBATER TURN CARD
+          const parsedBlocks = parseTurnContent(rawContent);
+
+          // Calculate height required for all blocks in this card
+          let totalTextHeight = 0;
+          const precalculatedBlocks: { heading: string; lines: string[] }[] = [];
+
+          parsedBlocks.forEach((b) => {
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'normal');
+            const lines = doc.splitTextToSize(b.body, contentWidth - 14);
+            precalculatedBlocks.push({ heading: b.heading, lines });
+            totalTextHeight += (lines.length * 4.0) + 5.5;
+          });
+
+          const cardHeight = Math.max(22, totalTextHeight + 11);
+
+          // Check if card fits on current page
+          if (curY + cardHeight > 270) {
+            doc.addPage();
+            curY = 22;
+          }
+
+          // Card Background & Border
+          if (isAgentA) {
+            doc.setFillColor(248, 250, 252); // Slate 50
+            doc.setDrawColor(199, 210, 254); // Indigo 200
+          } else {
+            doc.setFillColor(248, 250, 252); // Slate 50
+            doc.setDrawColor(254, 202, 202); // Rose 200
+          }
+          doc.setLineWidth(0.4);
+          doc.roundedRect(margin, curY, contentWidth, cardHeight, 2.5, 2.5, 'FD');
+
+          // Left Accent Strip
+          if (isAgentA) {
+            doc.setFillColor(79, 70, 229); // Indigo 600
+          } else {
+            doc.setFillColor(220, 38, 38); // Red 600
+          }
+          doc.roundedRect(margin, curY, 2.5, cardHeight, 1.2, 1.2, 'F');
+
+          // Card Header Bar
+          let cardY = curY + 6;
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
+          if (isAgentA) {
+            doc.setTextColor(49, 46, 129); // Indigo 900
+          } else {
+            doc.setTextColor(153, 27, 27); // Red 900
+          }
+          doc.text(`[${roundLabel} • ${phaseLabel}]: ${senderName} (${roleTitle})`, margin + 6, cardY);
+          cardY += 5;
+
+          // Render Parsed Sections
+          precalculatedBlocks.forEach((b) => {
+            const isBottomLine = b.heading.toLowerCase().includes('bottom line');
+
+            // Section Heading
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'bold');
+            if (isBottomLine) {
+              doc.setTextColor(5, 150, 105); // Emerald 600
+            } else if (isAgentA) {
+              doc.setTextColor(79, 70, 229); // Indigo 600
+            } else {
+              doc.setTextColor(190, 24, 93); // Rose 700
+            }
+            doc.text(`${b.heading.toUpperCase()}:`, margin + 6, cardY);
+            cardY += 4;
+
+            // Section Body Lines
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(51, 65, 85); // Slate 700
+            doc.text(b.lines, margin + 6, cardY);
+            cardY += (b.lines.length * 4.0) + 2.5;
+          });
+
+          curY += cardHeight + 5;
         }
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(t.speaker_id === 'agent_a' ? 79 : 190, t.speaker_id === 'agent_a' ? 70 : 24, t.speaker_id === 'agent_a' ? 229 : 93);
-        doc.text(`[Round ${t.round_number}] ${t.sender_name} (${t.role_title}):`, 14, curY);
-        curY += 5;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(51, 65, 85);
-        const summarySnippet = t.content.split('\n')[0].replace(/\*\*/g, '').slice(0, 220);
-        const splitSnippet = doc.splitTextToSize(summarySnippet + (summarySnippet.length >= 220 ? '...' : ''), pageWidth - 32);
-        doc.text(splitSnippet, 16, curY);
-        curY += (splitSnippet.length * 4.5) + 4;
       });
     }
 
-    // 5. Concessions & Blind Spots
-    if (curY > 220) {
+    // ==========================================
+    // 6. Concessions & Unresolved Blind Spots
+    // ==========================================
+    if (curY > 215) {
       doc.addPage();
-      curY = 20;
+      curY = 22;
     }
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(30, 41, 59);
-    doc.text('Key Concessions & Critical Unresolved Risks:', 14, curY);
-    curY += 6;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(5, 150, 105); // emerald-600
-    doc.text('Key Concessions:', 14, curY);
-    curY += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(51, 65, 85);
-    (verdict.key_concessions || []).forEach((c) => {
-      const splitC = doc.splitTextToSize(`• ${c}`, pageWidth - 32);
-      doc.text(splitC, 16, curY);
-      curY += (splitC.length * 4.5) + 2;
-    });
-
-    curY += 3;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(217, 119, 6); // amber-600
-    doc.text('Unresolved Blind Spots & Failure Modes:', 14, curY);
-    curY += 5;
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(51, 65, 85);
-    (verdict.unresolved_risks || []).forEach((r) => {
-      const splitR = doc.splitTextToSize(`• ${r}`, pageWidth - 32);
-      doc.text(splitR, 16, curY);
-      curY += (splitR.length * 4.5) + 2;
-    });
-
-    // 6. Action Plan
-    curY += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(79, 70, 229); // indigo-600
-    doc.text('Prioritized Action Plan:', 14, curY);
-    curY += 5;
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10.5);
     doc.setTextColor(15, 23, 42);
-    (verdict.action_plan || []).forEach((step, idx) => {
-      const splitStep = doc.splitTextToSize(`${idx + 1}. ${step}`, pageWidth - 32);
-      doc.text(splitStep, 16, curY);
-      curY += (splitStep.length * 4.5) + 2;
+    doc.text('Key Concessions & Unresolved Vulnerabilities:', margin, curY);
+    curY += 5;
+
+    // Concessions Box
+    const concessions = (verdict.key_concessions || []).map((c) => cleanPdfText(c));
+    let cHeight = 10;
+    const splitCList: string[][] = [];
+    concessions.forEach((c) => {
+      doc.setFontSize(8.5);
+      const lines = doc.splitTextToSize(`[v]  ${c}`, contentWidth - 12);
+      splitCList.push(lines);
+      cHeight += (lines.length * 4.2) + 2;
     });
+
+    if (curY + cHeight > 270) {
+      doc.addPage();
+      curY = 22;
+    }
+
+    doc.setFillColor(240, 253, 244); // Emerald 50
+    doc.setDrawColor(167, 243, 208); // Emerald 200
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, curY, contentWidth, Math.max(16, cHeight), 2, 2, 'FD');
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(5, 150, 105); // Emerald 600
+    doc.text('VALIDATED CONCESSIONS & COMMON GROUND:', margin + 6, curY + 6);
+
+    let cY = curY + 11;
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+    splitCList.forEach((lines) => {
+      doc.text(lines, margin + 6, cY);
+      cY += (lines.length * 4.2) + 2;
+    });
+
+    curY += Math.max(16, cHeight) + 6;
+
+    // Blind Spots Box
+    const risks = (verdict.unresolved_risks || []).map((r) => cleanPdfText(r));
+    let rHeight = 10;
+    const splitRList: string[][] = [];
+    risks.forEach((r) => {
+      doc.setFontSize(8.5);
+      const lines = doc.splitTextToSize(`[!]  ${r}`, contentWidth - 12);
+      splitRList.push(lines);
+      rHeight += (lines.length * 4.2) + 2;
+    });
+
+    if (curY + rHeight > 270) {
+      doc.addPage();
+      curY = 22;
+    }
+
+    doc.setFillColor(254, 252, 232); // Amber 50
+    doc.setDrawColor(253, 230, 138); // Amber 200
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, curY, contentWidth, Math.max(16, rHeight), 2, 2, 'FD');
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(217, 119, 6); // Amber 600
+    doc.text('CRITICAL UNRESOLVED RISKS & BLIND SPOTS:', margin + 6, curY + 6);
+
+    let rY = curY + 11;
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+    splitRList.forEach((lines) => {
+      doc.text(lines, margin + 6, rY);
+      rY += (lines.length * 4.2) + 2;
+    });
+
+    curY += Math.max(16, rHeight) + 6;
+
+    // ==========================================
+    // 7. Prioritized Action Plan
+    // ==========================================
+    const actions = (verdict.action_plan || []).map((a) => cleanPdfText(a));
+    let aHeight = 10;
+    const splitAList: string[][] = [];
+    actions.forEach((a, idx) => {
+      doc.setFontSize(8.5);
+      const lines = doc.splitTextToSize(`${idx + 1}.  ${a}`, contentWidth - 12);
+      splitAList.push(lines);
+      aHeight += (lines.length * 4.2) + 2;
+    });
+
+    if (curY + aHeight > 270) {
+      doc.addPage();
+      curY = 22;
+    }
+
+    doc.setFillColor(238, 242, 255); // Indigo 50
+    doc.setDrawColor(199, 210, 254); // Indigo 200
+    doc.setLineWidth(0.4);
+    doc.roundedRect(margin, curY, contentWidth, Math.max(16, aHeight), 2, 2, 'FD');
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(67, 56, 202); // Indigo 700
+    doc.text('PRIORITIZED EXECUTIVE ACTION PLAN:', margin + 6, curY + 6);
+
+    let aY = curY + 11;
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(30, 41, 59);
+    splitAList.forEach((lines) => {
+      doc.text(lines, margin + 6, aY);
+      aY += (lines.length * 4.2) + 2;
+    });
+
+    // ==========================================
+    // 8. Two-Pass Running Headers & Footers
+    // ==========================================
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+
+      // Running Header on Pages 2+
+      if (p > 1) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184); // Slate 400
+        doc.text('POLYARGUMINDS EXECUTIVE REPORT', margin, 11);
+        const shortTopic = cleanTopic.length > 55 ? cleanTopic.slice(0, 52) + '...' : cleanTopic;
+        doc.text(shortTopic, pageWidth - margin, 11, { align: 'right' });
+
+        doc.setDrawColor(226, 232, 240); // Slate 200
+        doc.setLineWidth(0.3);
+        doc.line(margin, 13, pageWidth - margin, 13);
+      }
+
+      // Running Footer on All Pages
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.3);
+      doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text('CONFIDENTIAL • GENERATED BY POLYARGUMINDS AUTONOMOUS ENGINE', margin, pageHeight - 7);
+      doc.text(`Page ${p} of ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+    }
 
     doc.save(`Executive_Decision_Report_${Date.now()}.pdf`);
   };
@@ -320,7 +687,7 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
               {turns.map((t) => (
                 <div key={t.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80 text-xs">
                   <div className="flex items-center justify-between mb-1">
-                    <span className={`font-semibold ${t.speaker_id === 'agent_a' ? 'text-indigo-400' : 'text-rose-400'}`}>
+                    <span className={`font-semibold ${t.speaker_id === 'agent_a' ? 'text-indigo-400' : (t.speaker_id === 'moderator' ? 'text-amber-400' : 'text-rose-400')}`}>
                       {t.sender_name} ({t.role_title})
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono">
