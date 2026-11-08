@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Award, CheckCircle2, AlertTriangle, Download, Scale, ArrowRight, FileText } from 'lucide-react';
+import { X, Award, CheckCircle2, AlertTriangle, Download, Scale, ArrowRight, FileText, ShieldAlert } from 'lucide-react';
 import { Verdict, MessageTurn } from '../lib/types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -61,7 +61,7 @@ function extractScore(scorecard: any, targetKey: 'agent_a' | 'agent_b'): AgentSc
   };
 }
 
-// Clean all emojis and non-standard unicode that break jsPDF's built-in Helvetica font
+// Clean emojis and non-ASCII chars for jsPDF Helvetica font
 function cleanPdfText(text: string): string {
   if (!text) return '';
   return text
@@ -77,40 +77,104 @@ function cleanPdfText(text: string): string {
     .trim();
 }
 
-interface ParsedBlock {
-  heading: string;
-  body: string;
+export interface TurnSummary {
+  speakerId: string;
+  senderName: string;
+  roleTitle: string;
+  roundNumber: number;
+  aspect: string;
+  isModerator: boolean;
+  bulletPoints: string[];
 }
 
-function parseTurnContent(content: string): ParsedBlock[] {
-  const cleaned = cleanPdfText(content);
-  if (!cleaned) return [];
+// Extract exactly 2 to 3 important executive points per turn
+export function extractKeyTakeaways(turn: MessageTurn): TurnSummary {
+  const isMod = turn.speaker_id === 'moderator';
+  const raw = cleanPdfText(turn.content);
 
-  const blocks: ParsedBlock[] = [];
+  if (isMod) {
+    let cleanConstraint = raw;
+    const match = raw.match(/MODERATOR CONSTRAINT INJECTED:\s*"([^"]+)"/i);
+    if (match) {
+      cleanConstraint = match[1];
+    } else {
+      cleanConstraint = cleanConstraint
+        .replace(/^[⚠️\s]*MODERATOR CONSTRAINT INJECTED:\s*/i, '')
+        .replace(/\.?\s*Both participants must incorporate this requirement immediately\.?/i, '')
+        .replace(/^"|"$/g, '')
+        .trim();
+    }
+    return {
+      speakerId: turn.speaker_id,
+      senderName: turn.sender_name || 'Moderator',
+      roleTitle: turn.role_title || 'Human Moderator',
+      roundNumber: turn.round_number,
+      aspect: cleanPdfText(turn.phase || 'Human Directive'),
+      isModerator: true,
+      bulletPoints: [`Steering Constraint: "${cleanConstraint}"`]
+    };
+  }
+
+  // Parse structured blocks: Core Stance, Key Argument, Rebuttal, Bottom Line
   const regex = /(?:\*\*|\b)(Core Stance(?:\s+on\s+[^:]+)?|Key Argument & Evidence|Rebuttal \/ Scrutiny|Bottom Line|Key Evidence|Rebuttal|Takeaway)(?:\*\*|\b)[:\s]*([\s\S]*?)(?=(?:\*\*|\b)(?:Core Stance|Key Argument & Evidence|Rebuttal \/ Scrutiny|Bottom Line|Key Evidence|Rebuttal|Takeaway)(?:\*\*|\b)[:\s]*|$)/gi;
 
-  let match;
-  let hasMatches = false;
-  while ((match = regex.exec(cleaned)) !== null) {
-    hasMatches = true;
-    const heading = match[1].replace(/\*\*/g, '').trim();
-    const body = match[2].replace(/\*\*/g, '').trim();
-    if (body) {
-      blocks.push({ heading, body });
+  const extracted: { label: string; text: string }[] = [];
+  let m;
+  while ((m = regex.exec(raw)) !== null) {
+    const label = m[1].replace(/\*\*/g, '').trim();
+    const text = m[2].replace(/\*\*/g, '').trim();
+    if (text) {
+      extracted.push({ label, text });
     }
   }
 
-  if (!hasMatches || blocks.length === 0) {
-    const paras = cleaned.split(/\n\s*\n/).map((p) => p.replace(/\*\*/g, '').trim()).filter(Boolean);
-    paras.forEach((p, idx) => {
-      blocks.push({
-        heading: idx === 0 ? 'Core Stance' : idx === paras.length - 1 ? 'Bottom Line' : 'Key Argument',
-        body: p
-      });
+  const bullets: string[] = [];
+
+  const cleanFirstSentence = (text: string, maxLen: number = 145): string => {
+    if (!text) return '';
+    const firstSent = text.split(/(?<=[.!?])\s+/)[0] || text;
+    const trimmed = firstSent.replace(/\s+/g, ' ').trim();
+    return trimmed.length > maxLen ? trimmed.slice(0, maxLen - 3).trim() + '...' : trimmed;
+  };
+
+  if (extracted.length > 0) {
+    // 1. Core Stance (Position)
+    const stance = extracted.find((e) => /stance/i.test(e.label));
+    if (stance) {
+      bullets.push(`Core Stance: ${cleanFirstSentence(stance.text, 140)}`);
+    }
+
+    // 2. Key Argument & Evidence (Data/Reasoning)
+    const evidence = extracted.find((e) => /argument|evidence/i.test(e.label));
+    if (evidence) {
+      bullets.push(`Evidence & Scrutiny: ${cleanFirstSentence(evidence.text, 150)}`);
+    }
+
+    // 3. Bottom Line (Takeaway)
+    const bottomLine = extracted.find((e) => /bottom line|takeaway|rebuttal/i.test(e.label));
+    if (bottomLine) {
+      bullets.push(`Strategic Takeaway: ${cleanFirstSentence(bottomLine.text, 140)}`);
+    }
+  }
+
+  // Fallback if unstructured
+  if (bullets.length === 0) {
+    const paras = raw.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    paras.slice(0, 3).forEach((p, i) => {
+      const label = i === 0 ? 'Core Thesis' : (i === 1 ? 'Evidence Point' : 'Takeaway');
+      bullets.push(`${label}: ${cleanFirstSentence(p, 145)}`);
     });
   }
 
-  return blocks;
+  return {
+    speakerId: turn.speaker_id,
+    senderName: turn.sender_name || 'Debater',
+    roleTitle: turn.role_title || 'Expert',
+    roundNumber: turn.round_number,
+    aspect: cleanPdfText(turn.phase || 'General'),
+    isModerator: false,
+    bulletPoints: bullets.slice(0, 3) // strictly max 2-3 points!
+  };
 }
 
 export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
@@ -123,6 +187,8 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
   const isCollab = mode === 'COLLABORATIVE';
   const scoreA = extractScore(verdict.scorecard, 'agent_a');
   const scoreB = extractScore(verdict.scorecard, 'agent_b');
+
+  const summarizedTurns = turns.map((t) => extractKeyTakeaways(t));
 
   const generatePdf = () => {
     const doc = new jsPDF({
@@ -161,12 +227,12 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
     doc.setTextColor(148, 163, 184); // Slate 400
     doc.text('AUTONOMOUS DIALECTIC STRESS-TEST & EXECUTIVE DECISION ARBITRATION', margin, 23);
 
-    // Meta badges on banner
+    // Meta chips on banner
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(226, 232, 240); // Slate 200
     const modeLabel = isCollab ? 'MODE: COLLABORATIVE DESIGN REVIEW' : 'MODE: RED-TEAM STRESS-TEST';
-    doc.text(`${modeLabel}   |   DATE: ${new Date().toLocaleDateString()}   |   ROUNDS: ${verdict.scorecard ? 'EVALUATED' : 'CONCLUDED'}`, margin, 30);
+    doc.text(`${modeLabel}   |   DATE: ${new Date().toLocaleDateString()}   |   SYNTHESIS: COMPLETED`, margin, 30);
 
     let curY = 44;
 
@@ -208,7 +274,6 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
     const splitRec = doc.splitTextToSize(cleanRec, contentWidth - 14);
     const recBoxHeight = (splitRec.length * 4.5) + 14;
 
-    // Box Fill & Border
     if (isCollab) {
       doc.setFillColor(250, 245, 255); // Purple 50
       doc.setDrawColor(216, 180, 254); // Purple 300
@@ -286,7 +351,6 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
         fillColor: [248, 250, 252]
       },
       didParseCell: (data) => {
-        // Highlight composite total row
         if (data.row.index === 3) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fillColor = isCollab ? [243, 232, 255] : [224, 231, 255];
@@ -298,10 +362,10 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
     curY = (doc as any).lastAutoTable.finalY + 8;
 
     // ==========================================
-    // 5. Key Argument Breakdown by Round (Cards)
+    // 5. Key Argument Takeaways (2-3 Points per Turn)
     // ==========================================
-    if (turns.length > 0) {
-      if (curY > 230) {
+    if (summarizedTurns.length > 0) {
+      if (curY > 235) {
         doc.addPage();
         curY = 22;
       }
@@ -309,134 +373,83 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10.5);
       doc.setTextColor(15, 23, 42);
-      doc.text('Key Argument Breakdown & Dialectic Synthesis Across Rounds:', margin, curY);
-      curY += 6;
+      doc.text('Key Argument Takeaways Across Rounds (2-3 Core Points Each):', margin, curY);
+      curY += 5.5;
 
-      turns.forEach((t) => {
-        const isMod = t.speaker_id === 'moderator';
-        const isAgentA = t.speaker_id === 'agent_a';
-        const rawContent = cleanPdfText(t.content);
+      summarizedTurns.forEach((st) => {
+        const isAgentA = st.speakerId === 'agent_a';
+        const isMod = st.isModerator;
 
-        // Header info
-        const roundLabel = `Round ${t.round_number}`;
-        const phaseLabel = cleanPdfText(t.phase || (isMod ? 'Human Constraint' : 'Dialectic Turn'));
-        const senderName = cleanPdfText(t.sender_name || (isMod ? 'Moderator' : 'Debater'));
-        const roleTitle = cleanPdfText(t.role_title || (isMod ? 'Human Moderator' : 'Expert'));
+        // Calculate card height dynamically based on the 2-3 points
+        let bulletLinesCount = 0;
+        const precalculatedBullets: string[][] = [];
 
+        st.bulletPoints.forEach((pt) => {
+          doc.setFontSize(8.5);
+          const lines = doc.splitTextToSize(`•  ${pt}`, contentWidth - 14);
+          precalculatedBullets.push(lines);
+          bulletLinesCount += lines.length;
+        });
+
+        const cardHeight = Math.max(16, (bulletLinesCount * 4.2) + 12);
+
+        // Page break if card doesn't fit
+        if (curY + cardHeight > 275) {
+          doc.addPage();
+          curY = 22;
+        }
+
+        // Card styling
         if (isMod) {
-          // MODERATOR DIRECTIVE CARD
-          const cleanConstraint = rawContent.replace(/^MODERATOR CONSTRAINT INJECTED:\s*/i, '').replace(/\.\s*Both participants must incorporate.*$/i, '');
-          const splitMod = doc.splitTextToSize(`"${cleanConstraint}"`, contentWidth - 14);
-          const modHeight = (splitMod.length * 4.3) + 14;
-
-          if (curY + modHeight > 270) {
-            doc.addPage();
-            curY = 22;
-          }
-
           doc.setFillColor(254, 252, 232); // Amber 50
           doc.setDrawColor(245, 158, 11); // Amber 500
-          doc.setLineWidth(0.4);
-          doc.roundedRect(margin, curY, contentWidth, modHeight, 2, 2, 'FD');
-
-          // Amber left bar
-          doc.setFillColor(217, 119, 6); // Amber 600
-          doc.roundedRect(margin, curY, 2.5, modHeight, 1, 1, 'F');
-
-          // Header
-          doc.setFontSize(7.5);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(180, 83, 9); // Amber 700
-          doc.text(`[${roundLabel.toUpperCase()} • MODERATOR STRATEGIC DIRECTIVE INJECTED]`, margin + 6, curY + 5.5);
-
-          doc.setFontSize(8.5);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(69, 26, 3); // Amber 950
-          doc.text(splitMod, margin + 6, curY + 10.5);
-
-          curY += modHeight + 5;
+        } else if (isAgentA) {
+          doc.setFillColor(248, 250, 252); // Slate 50
+          doc.setDrawColor(199, 210, 254); // Indigo 200
         } else {
-          // DEBATER TURN CARD
-          const parsedBlocks = parseTurnContent(rawContent);
-
-          // Calculate height required for all blocks in this card
-          let totalTextHeight = 0;
-          const precalculatedBlocks: { heading: string; lines: string[] }[] = [];
-
-          parsedBlocks.forEach((b) => {
-            doc.setFontSize(8.5);
-            doc.setFont('helvetica', 'normal');
-            const lines = doc.splitTextToSize(b.body, contentWidth - 14);
-            precalculatedBlocks.push({ heading: b.heading, lines });
-            totalTextHeight += (lines.length * 4.0) + 5.5;
-          });
-
-          const cardHeight = Math.max(22, totalTextHeight + 11);
-
-          // Check if card fits on current page
-          if (curY + cardHeight > 270) {
-            doc.addPage();
-            curY = 22;
-          }
-
-          // Card Background & Border
-          if (isAgentA) {
-            doc.setFillColor(248, 250, 252); // Slate 50
-            doc.setDrawColor(199, 210, 254); // Indigo 200
-          } else {
-            doc.setFillColor(248, 250, 252); // Slate 50
-            doc.setDrawColor(254, 202, 202); // Rose 200
-          }
-          doc.setLineWidth(0.4);
-          doc.roundedRect(margin, curY, contentWidth, cardHeight, 2.5, 2.5, 'FD');
-
-          // Left Accent Strip
-          if (isAgentA) {
-            doc.setFillColor(79, 70, 229); // Indigo 600
-          } else {
-            doc.setFillColor(220, 38, 38); // Red 600
-          }
-          doc.roundedRect(margin, curY, 2.5, cardHeight, 1.2, 1.2, 'F');
-
-          // Card Header Bar
-          let cardY = curY + 6;
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'bold');
-          if (isAgentA) {
-            doc.setTextColor(49, 46, 129); // Indigo 900
-          } else {
-            doc.setTextColor(153, 27, 27); // Red 900
-          }
-          doc.text(`[${roundLabel} • ${phaseLabel}]: ${senderName} (${roleTitle})`, margin + 6, cardY);
-          cardY += 5;
-
-          // Render Parsed Sections
-          precalculatedBlocks.forEach((b) => {
-            const isBottomLine = b.heading.toLowerCase().includes('bottom line');
-
-            // Section Heading
-            doc.setFontSize(7.5);
-            doc.setFont('helvetica', 'bold');
-            if (isBottomLine) {
-              doc.setTextColor(5, 150, 105); // Emerald 600
-            } else if (isAgentA) {
-              doc.setTextColor(79, 70, 229); // Indigo 600
-            } else {
-              doc.setTextColor(190, 24, 93); // Rose 700
-            }
-            doc.text(`${b.heading.toUpperCase()}:`, margin + 6, cardY);
-            cardY += 4;
-
-            // Section Body Lines
-            doc.setFontSize(8.5);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(51, 65, 85); // Slate 700
-            doc.text(b.lines, margin + 6, cardY);
-            cardY += (b.lines.length * 4.0) + 2.5;
-          });
-
-          curY += cardHeight + 5;
+          doc.setFillColor(248, 250, 252); // Slate 50
+          doc.setDrawColor(254, 202, 202); // Rose 200
         }
+
+        doc.setLineWidth(0.4);
+        doc.roundedRect(margin, curY, contentWidth, cardHeight, 2, 2, 'FD');
+
+        // Left accent bar
+        if (isMod) {
+          doc.setFillColor(217, 119, 6); // Amber 600
+        } else if (isAgentA) {
+          doc.setFillColor(79, 70, 229); // Indigo 600
+        } else {
+          doc.setFillColor(220, 38, 38); // Red 600
+        }
+        doc.roundedRect(margin, curY, 2.5, cardHeight, 1, 1, 'F');
+
+        // Header Title
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        if (isMod) {
+          doc.setTextColor(180, 83, 9); // Amber 700
+          doc.text(`[Round ${st.roundNumber} • Human Steering Directive]: ${st.senderName}`, margin + 6, curY + 5.5);
+        } else if (isAgentA) {
+          doc.setTextColor(49, 46, 129); // Indigo 900
+          doc.text(`[Round ${st.roundNumber} • ${st.aspect}]: ${st.senderName} (${st.roleTitle})`, margin + 6, curY + 5.5);
+        } else {
+          doc.setTextColor(153, 27, 27); // Red 900
+          doc.text(`[Round ${st.roundNumber} • ${st.aspect}]: ${st.senderName} (${st.roleTitle})`, margin + 6, curY + 5.5);
+        }
+
+        // Render the 2-3 bullet points
+        let bulletY = curY + 10;
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85); // Slate 700
+
+        precalculatedBullets.forEach((lines) => {
+          doc.text(lines, margin + 6, bulletY);
+          bulletY += (lines.length * 4.2) + 1;
+        });
+
+        curY += cardHeight + 4;
       });
     }
 
@@ -572,7 +585,6 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
     for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
 
-      // Running Header on Pages 2+
       if (p > 1) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
@@ -586,7 +598,6 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
         doc.line(margin, 13, pageWidth - margin, 13);
       }
 
-      // Running Footer on All Pages
       doc.setDrawColor(226, 232, 240);
       doc.setLineWidth(0.3);
       doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
@@ -676,27 +687,66 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
           </div>
         </div>
 
-        {/* Argument Key Takeaways Section */}
-        {turns.length > 0 && (
+        {/* Argument Key Takeaways Section (Concise 2-3 Bullet Points) */}
+        {summarizedTurns.length > 0 && (
           <div className="mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <FileText size={14} className="text-indigo-400" />
-              <span>Key Argument Breakdown Across Rounds</span>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <FileText size={14} className="text-indigo-400" />
+                <span>Executive Key Argument Takeaways Across Rounds</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {summarizedTurns.length} turns evaluated
+              </span>
             </h3>
-            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-              {turns.map((t) => (
-                <div key={t.id} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80 text-xs">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`font-semibold ${t.speaker_id === 'agent_a' ? 'text-indigo-400' : (t.speaker_id === 'moderator' ? 'text-amber-400' : 'text-rose-400')}`}>
-                      {t.sender_name} ({t.role_title})
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {summarizedTurns.map((st, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-lg border text-xs ${
+                    st.isModerator
+                      ? 'bg-amber-950/20 border-amber-600/30'
+                      : st.speakerId === 'agent_a'
+                      ? 'bg-indigo-950/20 border-indigo-900/40'
+                      : 'bg-rose-950/20 border-rose-900/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-800/60">
+                    <span
+                      className={`font-semibold ${
+                        st.isModerator
+                          ? 'text-amber-400'
+                          : st.speakerId === 'agent_a'
+                          ? 'text-indigo-400'
+                          : 'text-rose-400'
+                      }`}
+                    >
+                      {st.senderName} ({st.roleTitle})
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono">
-                      Round {t.round_number} • {t.phase}
+                      Round {st.roundNumber} • {st.aspect}
                     </span>
                   </div>
-                  <p className="text-slate-300 leading-snug line-clamp-2">
-                    {t.content.replace(/\*\*/g, '')}
-                  </p>
+
+                  {/* 2-3 Clean Bullet Points */}
+                  <ul className="space-y-1">
+                    {st.bulletPoints.map((pt, pIdx) => (
+                      <li key={pIdx} className="flex items-start gap-1.5 text-slate-300 leading-relaxed text-[11.5px]">
+                        <span
+                          className={`font-bold shrink-0 mt-0.5 ${
+                            st.isModerator
+                              ? 'text-amber-400'
+                              : st.speakerId === 'agent_a'
+                              ? 'text-indigo-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          •
+                        </span>
+                        <span>{pt}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>

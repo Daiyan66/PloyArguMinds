@@ -127,13 +127,35 @@ export const AgentBubble: React.FC<AgentBubbleProps> = ({ turn, streaming, perso
   const isCollab = mode === 'COLLABORATIVE';
 
   if (isModerator) {
+    let cleanText = (content || '').trim();
+    // Strip any legacy boilerplates like 'MODERATOR CONSTRAINT INJECTED: "..."'
+    const quotedMatch = cleanText.match(/MODERATOR CONSTRAINT INJECTED:\s*"([^"]+)"/i);
+    if (quotedMatch) {
+      cleanText = quotedMatch[1];
+    } else {
+      cleanText = cleanText
+        .replace(/^[⚠️\s]*MODERATOR CONSTRAINT INJECTED:\s*/i, '')
+        .replace(/\.?\s*Both participants must incorporate this requirement immediately\.?/i, '')
+        .replace(/^"|"$/g, '')
+        .trim();
+    }
+
     return (
-      <div className="my-4 p-4 rounded-xl bg-amber-950/30 border border-amber-600/40 text-amber-200 text-xs">
-        <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-amber-400 mb-1">
-          <ShieldAlert size={14} />
-          <span>Moderator Constraint Injected</span>
+      <div className="my-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-950/40 via-amber-950/20 to-slate-900 border border-amber-500/30 text-xs shadow-md">
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-amber-400 text-[10px]">
+            <ShieldAlert size={13} />
+            <span>Human Steering Directive</span>
+          </div>
+          {turn?.round_number && (
+            <span className="text-[9px] font-mono text-amber-400/80 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/60">
+              Round {turn.round_number}
+            </span>
+          )}
         </div>
-        <p className="text-slate-200 text-sm leading-relaxed">{content}</p>
+        <p className="text-amber-100 text-sm font-medium italic pl-1 leading-relaxed">
+          &ldquo;{cleanText}&rdquo;
+        </p>
       </div>
     );
   }

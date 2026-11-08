@@ -5,7 +5,7 @@ async def apply_interjections_node(state: DebateState) -> DebateState:
     while state.pending_interjections:
         interjection = state.pending_interjections.pop(0)
         
-        # Insert a special moderator turn into transcript
+        # Insert clean moderator directive into transcript without repetitive boilerplate
         moderator_turn = MessageTurn(
             id=str(uuid.uuid4()),
             speaker_id="moderator",
@@ -13,7 +13,7 @@ async def apply_interjections_node(state: DebateState) -> DebateState:
             role_title="Human Moderator",
             round_number=state.current_round,
             phase="INTERJECTION",
-            content=f"MODERATOR CONSTRAINT INJECTED: \"{interjection.content}\". Both participants must incorporate this requirement immediately.",
+            content=interjection.content.strip(),
             citations=[],
             fallacies=[]
         )
