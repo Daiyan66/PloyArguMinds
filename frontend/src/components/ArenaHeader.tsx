@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Award, ArrowLeft, CheckCircle2, Trash2, Plus, AlertTriangle, X } from 'lucide-react';
+import { Award, ArrowLeft, CheckCircle2, Trash2, Plus, AlertTriangle, X, BookOpen } from 'lucide-react';
 import { Verdict } from '../lib/types';
 import { ThemeToggle } from './ThemeToggle';
+import { PlatformGuideModal } from './PlatformGuideModal';
 
 interface ArenaHeaderProps {
   topic: string;
@@ -37,6 +38,7 @@ export const ArenaHeader: React.FC<ArenaHeaderProps> = ({
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   const maxAddable = Math.max(1, 10 - totalRounds);
 
@@ -149,6 +151,15 @@ export const ArenaHeader: React.FC<ArenaHeaderProps> = ({
               </button>
             )}
 
+            {/* Platform Guide Button */}
+            <button
+              onClick={() => setShowGuideModal(true)}
+              className="text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title="Platform Guide & Instructions"
+            >
+              <BookOpen size={15} />
+            </button>
+
             {/* Theme Toggle */}
             <ThemeToggle />
 
@@ -257,6 +268,12 @@ export const ArenaHeader: React.FC<ArenaHeaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Platform Guide Modal */}
+      <PlatformGuideModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+      />
     </>
   );
 };
