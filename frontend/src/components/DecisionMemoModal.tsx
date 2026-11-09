@@ -613,86 +613,88 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative">
+    <div className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 shadow-2xl relative text-slate-900 dark:text-slate-100">
         {/* Header */}
-        <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
+        <div className="flex justify-between items-start mb-6 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
-            <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs mb-1 uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold text-xs mb-1 uppercase tracking-wider">
               <Award size={18} />
               <span>Executive Synthesis & Decision Memo</span>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Dialectic Stress-Test Report
             </h2>
             <div className="flex items-center gap-2 mt-1">
               <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                isCollab ? 'text-purple-400 bg-purple-950/60 border-purple-800' : 'text-indigo-400 bg-indigo-950/60 border-indigo-800'
+                isCollab
+                  ? 'text-purple-700 bg-purple-50 border-purple-200 dark:text-purple-300 dark:bg-purple-950/60 dark:border-purple-800'
+                  : 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:text-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-800'
               }`}>
                 Mode: {isCollab ? 'Collaborative Review' : 'Red-Team Stress-Test'}
               </span>
-              <span className="text-xs text-slate-400 truncate max-w-md">
+              <span className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-md">
                 Topic: {topic}
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <X size={22} />
           </button>
         </div>
 
         {/* Highlighted Recommendation Banner */}
-        <div className="bg-indigo-950/50 border border-indigo-500/50 rounded-xl p-5 mb-6 shadow-inner">
-          <div className="flex items-center gap-2 text-indigo-300 font-bold text-xs uppercase tracking-wider mb-2">
+        <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-500/50 rounded-xl p-5 mb-6 shadow-sm">
+          <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-300 font-bold text-xs uppercase tracking-wider mb-2">
             <Scale size={16} />
             <span>Chief Adjudicator's Final Verdict</span>
           </div>
-          <p className="text-base sm:text-lg font-semibold text-white leading-relaxed">
+          <p className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white leading-relaxed">
             {verdict.executive_recommendation}
           </p>
         </div>
 
         {/* Scorecard Table */}
-        <div className="mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+        <div className="mb-6 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
             Multi-Rubric Evaluation Matrix
           </h3>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="font-semibold text-slate-400 text-left py-1">Dimension</div>
-            <div className="font-bold text-indigo-400 py-1 bg-indigo-950/40 rounded">
+            <div className="font-semibold text-slate-500 dark:text-slate-400 text-left py-1">Dimension</div>
+            <div className="font-bold text-indigo-700 dark:text-indigo-400 py-1 bg-indigo-100/60 dark:bg-indigo-950/40 rounded border border-indigo-200/60 dark:border-indigo-800/60">
               {isCollab ? 'Agent A (Strategist)' : 'Agent A (Advocate)'}
             </div>
-            <div className="font-bold text-rose-400 py-1 bg-rose-950/40 rounded">
+            <div className="font-bold text-rose-700 dark:text-rose-400 py-1 bg-rose-100/60 dark:bg-rose-950/40 rounded border border-rose-200/60 dark:border-rose-800/60">
               {isCollab ? 'Agent B (Reviewer)' : 'Agent B (Skeptic)'}
             </div>
 
-            <div className="text-slate-300 text-left py-1">Logical Rigor</div>
-            <div className="text-white py-1 font-mono">{scoreA.logical_rigor}/10</div>
-            <div className="text-white py-1 font-mono">{scoreB.logical_rigor}/10</div>
+            <div className="text-slate-600 dark:text-slate-300 text-left py-1 font-medium">Logical Rigor</div>
+            <div className="text-slate-900 dark:text-white py-1 font-mono font-semibold">{scoreA.logical_rigor}/10</div>
+            <div className="text-slate-900 dark:text-white py-1 font-mono font-semibold">{scoreB.logical_rigor}/10</div>
 
-            <div className="text-slate-300 text-left py-1">Evidence Grounding</div>
-            <div className="text-white py-1 font-mono">{scoreA.evidence_grounding}/10</div>
-            <div className="text-white py-1 font-mono">{scoreB.evidence_grounding}/10</div>
+            <div className="text-slate-600 dark:text-slate-300 text-left py-1 font-medium">Evidence Grounding</div>
+            <div className="text-slate-900 dark:text-white py-1 font-mono font-semibold">{scoreA.evidence_grounding}/10</div>
+            <div className="text-slate-900 dark:text-white py-1 font-mono font-semibold">{scoreB.evidence_grounding}/10</div>
 
-            <div className="text-slate-300 text-left py-1">Rebuttal / Synthesis</div>
-            <div className="text-white py-1 font-mono">{scoreA.rebuttal_directness}/10</div>
-            <div className="text-white py-1 font-mono">{scoreB.rebuttal_directness}/10</div>
+            <div className="text-slate-600 dark:text-slate-300 text-left py-1 font-medium">Rebuttal / Synthesis</div>
+            <div className="text-slate-900 dark:text-white py-1 font-mono font-semibold">{scoreA.rebuttal_directness}/10</div>
+            <div className="text-slate-900 dark:text-white py-1 font-mono font-semibold">{scoreB.rebuttal_directness}/10</div>
 
-            <div className="text-slate-200 text-left py-1 font-bold border-t border-slate-800">Composite Total</div>
-            <div className="text-indigo-300 py-1 font-bold font-mono border-t border-slate-800">{scoreA.total}/10</div>
-            <div className="text-rose-300 py-1 font-bold font-mono border-t border-slate-800">{scoreB.total}/10</div>
+            <div className="text-slate-900 dark:text-slate-100 text-left py-1.5 font-bold border-t border-slate-200 dark:border-slate-800">Composite Total</div>
+            <div className="text-indigo-700 dark:text-indigo-300 py-1.5 font-bold font-mono border-t border-slate-200 dark:border-slate-800">{scoreA.total}/10</div>
+            <div className="text-rose-700 dark:text-rose-300 py-1.5 font-bold font-mono border-t border-slate-200 dark:border-slate-800">{scoreB.total}/10</div>
           </div>
         </div>
 
         {/* Argument Key Takeaways Section (Concise 2-3 Bullet Points) */}
         {summarizedTurns.length > 0 && (
-          <div className="mb-6 bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+          <div className="mb-6 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <FileText size={14} className="text-indigo-400" />
+                <FileText size={14} className="text-indigo-600 dark:text-indigo-400" />
                 <span>Executive Key Argument Takeaways Across Rounds</span>
               </div>
               <span className="text-[10px] text-slate-500 font-mono">
@@ -703,22 +705,22 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
               {summarizedTurns.map((st, idx) => (
                 <div
                   key={idx}
-                  className={`p-3 rounded-lg border text-xs ${
+                  className={`p-3 rounded-lg border text-xs shadow-sm ${
                     st.isModerator
-                      ? 'bg-amber-950/20 border-amber-600/30'
+                      ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-600/30'
                       : st.speakerId === 'agent_a'
-                      ? 'bg-indigo-950/20 border-indigo-900/40'
-                      : 'bg-rose-950/20 border-rose-900/40'
+                      ? 'bg-white dark:bg-slate-900/60 border-indigo-200/80 dark:border-indigo-900/40'
+                      : 'bg-white dark:bg-slate-900/60 border-rose-200/80 dark:border-rose-900/40'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-800/60">
+                  <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-slate-100 dark:border-slate-800/60">
                     <span
                       className={`font-semibold ${
                         st.isModerator
-                          ? 'text-amber-400'
+                          ? 'text-amber-800 dark:text-amber-400'
                           : st.speakerId === 'agent_a'
-                          ? 'text-indigo-400'
-                          : 'text-rose-400'
+                          ? 'text-indigo-700 dark:text-indigo-400'
+                          : 'text-rose-700 dark:text-rose-400'
                       }`}
                     >
                       {st.senderName} ({st.roleTitle})
@@ -731,14 +733,14 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
                   {/* 2-3 Clean Bullet Points */}
                   <ul className="space-y-1">
                     {st.bulletPoints.map((pt, pIdx) => (
-                      <li key={pIdx} className="flex items-start gap-1.5 text-slate-300 leading-relaxed text-[11.5px]">
+                      <li key={pIdx} className="flex items-start gap-1.5 text-slate-700 dark:text-slate-300 leading-relaxed text-[11.5px]">
                         <span
                           className={`font-bold shrink-0 mt-0.5 ${
                             st.isModerator
-                              ? 'text-amber-400'
+                              ? 'text-amber-600 dark:text-amber-400'
                               : st.speakerId === 'agent_a'
-                              ? 'text-indigo-400'
-                              : 'text-rose-400'
+                              ? 'text-indigo-600 dark:text-indigo-400'
+                              : 'text-rose-600 dark:text-rose-400'
                           }`}
                         >
                           •
@@ -755,21 +757,21 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
 
         {/* Concessions & Risks Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <h4 className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider mb-2.5">
+          <div className="bg-emerald-50/60 dark:bg-slate-950 p-4 rounded-xl border border-emerald-200/80 dark:border-slate-800 shadow-sm">
+            <h4 className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider mb-2.5">
               <CheckCircle2 size={16} /> Key Concessions Made
             </h4>
-            <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+            <ul className="text-xs text-slate-700 dark:text-slate-300 space-y-2 list-disc list-inside">
               {(verdict.key_concessions || []).map((c, i) => (
                 <li key={i} className="leading-relaxed">{c}</li>
               ))}
             </ul>
           </div>
-          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-            <h4 className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider mb-2.5">
+          <div className="bg-amber-50/60 dark:bg-slate-950 p-4 rounded-xl border border-amber-200/80 dark:border-slate-800 shadow-sm">
+            <h4 className="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold text-xs uppercase tracking-wider mb-2.5">
               <AlertTriangle size={16} /> Unresolved Blind Spots
             </h4>
-            <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+            <ul className="text-xs text-slate-700 dark:text-slate-300 space-y-2 list-disc list-inside">
               {(verdict.unresolved_risks || []).map((r, i) => (
                 <li key={i} className="leading-relaxed">{r}</li>
               ))}
@@ -778,11 +780,11 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
         </div>
 
         {/* Prioritized Action Plan */}
-        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 mb-6">
-          <h4 className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider mb-2.5">
+        <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 mb-6 shadow-sm">
+          <h4 className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400 font-bold text-xs uppercase tracking-wider mb-2.5">
             <ArrowRight size={16} /> Prioritized Action Plan
           </h4>
-          <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside">
+          <ol className="text-xs text-slate-700 dark:text-slate-300 space-y-2 list-decimal list-inside">
             {(verdict.action_plan || []).map((step, i) => (
               <li key={i} className="leading-relaxed">{step}</li>
             ))}
@@ -790,10 +792,10 @@ export const DecisionMemoModal: React.FC<DecisionMemoModalProps> = ({
         </div>
 
         {/* Export Button */}
-        <div className="flex justify-end pt-2 border-t border-slate-800">
+        <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-slate-800">
           <button
             onClick={generatePdf}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-lg shadow-indigo-600/30"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-sm"
           >
             <Download size={16} />
             <span>Export Executive Decision Report (PDF)</span>

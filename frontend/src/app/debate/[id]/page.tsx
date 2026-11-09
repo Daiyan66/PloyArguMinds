@@ -99,7 +99,7 @@ export default function DebateArenaPage() {
   const isCollab = mode === 'COLLABORATIVE';
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col pb-28">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 flex flex-col pb-28 transition-colors duration-200">
       {/* Top Arena Header */}
       <ArenaHeader
         topic={topic}
@@ -123,24 +123,24 @@ export default function DebateArenaPage() {
               <div
                 className={`p-3.5 rounded-xl border transition ${
                   activeSpeakerId === 'agent_a'
-                    ? 'bg-indigo-950/40 border-indigo-500 shadow-md ring-1 ring-indigo-500/50'
-                    : 'bg-slate-900/60 border-slate-800'
+                    ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-400 dark:border-indigo-500 shadow-sm ring-1 ring-indigo-400/30'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-indigo-400">
+                  <span className="text-xs font-bold text-indigo-700 dark:text-indigo-400">
                     {isCollab ? 'Lead Strategist' : 'Lead Advocate'}
                   </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
                     isCollab
-                      ? 'text-purple-300 bg-purple-950/60 border-purple-800'
-                      : 'text-emerald-400 bg-emerald-950/60 border-emerald-800'
+                      ? 'text-purple-700 bg-purple-50 border-purple-200 dark:text-purple-300 dark:bg-purple-950/60 dark:border-purple-800'
+                      : 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/60 dark:border-emerald-800'
                   }`}>
                     {agentA.bias_direction}
                   </span>
                 </div>
-                <h4 className="text-sm font-semibold text-white">{agentA.name}</h4>
-                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{agentA.name}</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
                   {agentA.core_worldview}
                 </p>
               </div>
@@ -150,24 +150,24 @@ export default function DebateArenaPage() {
               <div
                 className={`p-3.5 rounded-xl border transition ${
                   activeSpeakerId === 'agent_b'
-                    ? 'bg-rose-950/40 border-rose-500 shadow-md ring-1 ring-rose-500/50'
-                    : 'bg-slate-900/60 border-slate-800'
+                    ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-400 dark:border-rose-500 shadow-sm ring-1 ring-rose-400/30'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-bold text-rose-400">
+                  <span className="text-xs font-bold text-rose-700 dark:text-rose-400">
                     {isCollab ? 'Principal Reviewer' : 'Chief Skeptic'}
                   </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${
                     isCollab
-                      ? 'text-sky-300 bg-sky-950/60 border-sky-800'
-                      : 'text-rose-400 bg-rose-950/60 border-rose-800'
+                      ? 'text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-300 dark:bg-sky-950/60 dark:border-sky-800'
+                      : 'text-rose-700 bg-rose-50 border-rose-200 dark:text-rose-400 dark:bg-rose-950/60 dark:border-rose-800'
                   }`}>
                     {agentB.bias_direction}
                   </span>
                 </div>
-                <h4 className="text-sm font-semibold text-white">{agentB.name}</h4>
-                <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">{agentB.name}</h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
                   {agentB.core_worldview}
                 </p>
               </div>
@@ -177,15 +177,15 @@ export default function DebateArenaPage() {
 
         {/* Empty State / Initial Loading */}
         {turns.length === 0 && !activeSpeakerId && (
-          <div className="text-center py-20">
-            <div className="inline-flex p-3 rounded-full bg-slate-900 border border-slate-800 mb-4 animate-pulse">
-              <MessageSquare className="text-indigo-400" size={24} />
+          <div className="text-center py-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm my-6 p-8">
+            <div className="inline-flex p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 mb-4 animate-pulse">
+              <MessageSquare className="text-indigo-600 dark:text-indigo-400" size={24} />
             </div>
-            <h3 className="text-base font-semibold text-white mb-1">
-              {isCollab ? 'Initializing Collaborative Review' : 'Initializing Dialectic Analysis'}
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-1">
+              {isCollab ? 'Initializing Collaborative Review' : 'Initializing Dialectic Stress-Test'}
             </h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              Synthesizing domain expert personas and mapping aspect agendas across rounds...
+            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
+              Synthesizing domain expert personas and mapping structured aspect agendas across rounds...
             </p>
           </div>
         )}
@@ -219,14 +219,14 @@ export default function DebateArenaPage() {
 
           {/* Session Concluded & Extend Action Banner */}
           {isFinished && totalRounds < 10 && (
-            <div className="mt-8 p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
-              <div className="flex items-center gap-2.5 text-xs text-slate-300 text-center sm:text-left">
-                <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <div className="mt-8 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-2.5 text-xs text-slate-600 dark:text-slate-300 text-center sm:text-left">
+                <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <div>
-                  <p className="font-semibold text-white">
-                    {isCollab ? 'Review Completed' : 'Debate Concluded'} ({totalRounds} of {totalRounds} Rounds)
+                  <p className="font-semibold text-slate-900 dark:text-white">
+                    {isCollab ? 'Review Completed' : 'Stress-Test Concluded'} ({totalRounds} of {totalRounds} Rounds)
                   </p>
-                  <p className="text-slate-400 text-[11px]">
+                  <p className="text-slate-500 dark:text-slate-400 text-[11px]">
                     Want to stress-test additional operational aspects? Resume and extend this chat (max 10 rounds).
                   </p>
                 </div>
@@ -234,15 +234,15 @@ export default function DebateArenaPage() {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => handleExtendRounds(1)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium border border-slate-200 dark:border-slate-700 transition flex items-center gap-1 shadow-sm"
                 >
-                  <Plus size={13} className="text-indigo-400" />
+                  <Plus size={13} className="text-indigo-600 dark:text-indigo-400" />
                   <span>+1 Round</span>
                 </button>
                 {totalRounds <= 8 && (
                   <button
                     onClick={() => handleExtendRounds(2)}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition flex items-center gap-1 shadow-md shadow-indigo-600/25"
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition flex items-center gap-1 shadow-sm"
                   >
                     <Plus size={13} />
                     <span>+2 Rounds</span>
