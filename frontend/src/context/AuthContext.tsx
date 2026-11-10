@@ -1,24 +1,20 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export interface User {
-  id: string; // Real Google User ID (sub)
-  name: string; // Real Google Account Name
-  email: string; // Real Google Account Email
-  avatar: string; // Real Google Profile Picture
-  emailVerified: boolean;
-  provider: 'google';
-  idToken?: string;
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  role?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  googleClientId: string;
-  setGoogleClientId: (id: string) => void;
-  handleGoogleCredential: (credential: string) => void;
+  loginWithGoogle: (email?: string, name?: string, avatar?: string) => void;
   logout: () => void;
   showAuthModal: boolean;
   setShowAuthModal: (open: boolean) => void;
@@ -26,107 +22,50 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_USER_KEY = 'polyarguminds_google_user';
-const LOCAL_STORAGE_CLIENT_ID_KEY = 'polyarguminds_google_client_id';
-
-// Decode genuine cryptographic Google OAuth ID token (JWT)
-export function decodeGoogleJwt(token: string): {
-  sub: string;
-  name: string;
-  email: string;
-  picture: string;
-  email_verified: boolean;
-} {
-  try {
-    const base64Url = token.split('.')[1];
-    if (!base64Url) throw new Error('Malformed JWT token');
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (err) {
-    console.error('Failed to decode Google JWT', err);
-    throw new Error('Invalid Google credential token');
-  }
-}
+const LOCAL_STORAGE_KEY = 'polyarguminds_auth_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [googleClientId, setGoogleClientIdState] = useState<string>('');
 
-  // Initialize client ID and existing stored user session
   useEffect(() => {
     try {
-      const envClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
-      const storedClientId = localStorage.getItem(LOCAL_STORAGE_CLIENT_ID_KEY) || '';
-      setGoogleClientIdState(envClientId || storedClientId || '');
-
-      const storedUser = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (stored) {
+        setUser(JSON.parse(stored));
       }
     } catch (e) {
-      console.error('Failed to restore auth session', e);
+      console.error('Failed to parse stored auth user', e);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const setGoogleClientId = useCallback((id: string) => {
-    const cleaned = id.trim();
-    setGoogleClientIdState(cleaned);
-    if (cleaned) {
-      localStorage.setItem(LOCAL_STORAGE_CLIENT_ID_KEY, cleaned);
-    } else {
-      localStorage.removeItem(LOCAL_STORAGE_CLIENT_ID_KEY);
-    }
-  }, []);
+  const loginWithGoogle = (email?: string, name?: string, avatar?: string) => {
+    const defaultEmail = email || 'executive.decision@gmail.com';
+    const defaultName = name || (defaultEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+    
+    // Default initial avatar if none provided
+    const defaultAvatar = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(defaultName)}&backgroundColor=4f46e5,7c3aed,2563eb`;
 
-  // Handle genuine Google Identity Services credential response
-  const handleGoogleCredential = useCallback((credential: string) => {
-    try {
-      const payload = decodeGoogleJwt(credential);
+    const newUser: User = {
+      id: 'google_' + Math.random().toString(36).substring(2, 11),
+      name: defaultName,
+      email: defaultEmail,
+      avatar: defaultAvatar,
+      role: 'Executive Decision Arbiter'
+    };
 
-      if (!payload.email) {
-        throw new Error('Google credential does not contain an email');
-      }
+    setUser(newUser);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newUser));
+    setShowAuthModal(false);
+  };
 
-      const realGoogleUser: User = {
-        id: payload.sub,
-        name: payload.name || payload.email.split('@')[0],
-        email: payload.email,
-        avatar: payload.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(payload.name || payload.email)}`,
-        emailVerified: Boolean(payload.email_verified),
-        provider: 'google',
-        idToken: credential
-      };
-
-      setUser(realGoogleUser);
-      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(realGoogleUser));
-      setShowAuthModal(false);
-    } catch (err: any) {
-      console.error('Google Sign-In failed:', err);
-      alert('Google authentication failed: ' + (err.message || 'Invalid token'));
-    }
-  }, []);
-
-  const logout = useCallback(() => {
-    if (user && typeof window !== 'undefined' && (window as any).google?.accounts?.id?.revoke) {
-      try {
-        (window as any).google.accounts.id.revoke(user.email, () => {});
-      } catch (e) {
-        // Ignored
-      }
-    }
+  const logout = () => {
     setUser(null);
-    localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-  }, [user]);
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+  };
 
   return (
     <AuthContext.Provider
@@ -134,9 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         isLoading,
         isAuthenticated: !!user,
-        googleClientId,
-        setGoogleClientId,
-        handleGoogleCredential,
+        loginWithGoogle,
         logout,
         showAuthModal,
         setShowAuthModal

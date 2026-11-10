@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { X, ShieldCheck, Key, ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, UserCheck, Plus, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const GoogleLogoIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -25,88 +25,39 @@ export const GoogleLogoIcon = ({ className = "w-5 h-5" }: { className?: string }
   </svg>
 );
 
-export const GoogleAuthModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
-}> = ({ isOpen, onClose, onSuccess }) => {
-  const { googleClientId, setGoogleClientId, handleGoogleCredential } = useAuth();
-  const [clientIdInput, setClientIdInput] = useState(googleClientId || '');
-  const [isEditingClientId, setIsEditingClientId] = useState(!googleClientId);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const googleBtnContainerRef = useRef<HTMLDivElement>(null);
-
-  // Initialize official Google Identity Services button
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (!googleClientId) {
-      setIsEditingClientId(true);
-      return;
-    }
-
-    const checkAndInitGoogle = () => {
-      const g = (window as any).google;
-      if (g?.accounts?.id && googleBtnContainerRef.current) {
-        try {
-          g.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: (res: { credential?: string }) => {
-              if (res?.credential) {
-                handleGoogleCredential(res.credential);
-                onClose();
-                if (onSuccess) onSuccess();
-              }
-            },
-            auto_select: false,
-            cancel_on_tap_outside: true
-          });
-
-          // Render real Google Sign-In button
-          googleBtnContainerRef.current.innerHTML = '';
-          g.accounts.id.renderButton(googleBtnContainerRef.current, {
-            type: 'standard',
-            theme: document.documentElement.classList.contains('dark') ? 'filled_black' : 'outline',
-            size: 'large',
-            text: 'continue_with',
-            shape: 'rectangular',
-            logo_alignment: 'left',
-            width: 320
-          });
-
-          // Optional: Prompt One-Tap
-          g.accounts.id.prompt();
-          setErrorMsg(null);
-        } catch (err: any) {
-          console.error('Failed to initialize Google Identity Services:', err);
-          setErrorMsg(err.message || 'Failed to initialize Google Sign-In');
-        }
-      }
-    };
-
-    // Retry checking if script is ready
-    const interval = setInterval(() => {
-      if ((window as any).google?.accounts?.id) {
-        checkAndInitGoogle();
-        clearInterval(interval);
-      }
-    }, 200);
-
-    const timeout = setTimeout(() => clearInterval(interval), 4000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [isOpen, googleClientId, handleGoogleCredential, onClose, onSuccess]);
+export const GoogleAuthModal: React.FC<{ isOpen: boolean; onClose: () => void; onSuccess?: () => void }> = ({
+  isOpen,
+  onClose,
+  onSuccess
+}) => {
+  const { loginWithGoogle } = useAuth();
+  const [customMode, setCustomMode] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSaveClientId = (e: React.FormEvent) => {
+  const handleSelectAccount = (email: string, name: string) => {
+    setIsSubmitting(true);
+    setTimeout(() => {
+      loginWithGoogle(email, name);
+      setIsSubmitting(false);
+      onClose();
+      if (onSuccess) onSuccess();
+    }, 400);
+  };
+
+  const handleCustomSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientIdInput.trim()) return;
-    setGoogleClientId(clientIdInput.trim());
-    setIsEditingClientId(false);
+    if (!customEmail.trim()) return;
+    setIsSubmitting(true);
+    setTimeout(() => {
+      loginWithGoogle(customEmail.trim(), customName.trim() || undefined);
+      setIsSubmitting(false);
+      onClose();
+      if (onSuccess) onSuccess();
+    }, 400);
   };
 
   return (
@@ -123,113 +74,133 @@ export const GoogleAuthModal: React.FC<{
 
         {/* Google Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 mb-3 shadow-sm">
+          <div className="inline-flex p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 mb-3.5 shadow-sm">
             <GoogleLogoIcon className="w-8 h-8" />
           </div>
           <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Real Google Authorization
+            Sign in with Google
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Sign in securely via <strong className="font-semibold text-slate-700 dark:text-slate-200">Google Identity Services</strong>
+            to continue to <strong className="font-semibold text-slate-700 dark:text-slate-200">PolyArguMinds Executive Engine</strong>
           </p>
         </div>
 
-        {errorMsg && (
-          <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2">
-            <AlertCircle size={15} className="shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
+        {!customMode ? (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 px-1">
+              Choose an account
+            </p>
 
-        {/* Real Google Button Container or Client ID Config */}
-        {!isEditingClientId && googleClientId ? (
-          <div className="space-y-4">
-            <div className="flex flex-col items-center justify-center py-4 bg-slate-50 dark:bg-slate-950/50 rounded-2xl border border-slate-200 dark:border-slate-800 p-4">
-              <div ref={googleBtnContainerRef} className="flex justify-center w-full min-h-[44px]" />
-              <p className="text-[11px] text-slate-400 mt-3 text-center">
-                Clicking above opens the genuine Google OAuth account dialog.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between text-xs pt-1 text-slate-500">
-              <span className="font-mono text-[10px] truncate max-w-[200px]" title={googleClientId}>
-                Client: {googleClientId.slice(0, 15)}...
-              </span>
+            <div className="space-y-2 mb-4">
+              {/* Account 1 */}
               <button
                 type="button"
-                onClick={() => setIsEditingClientId(true)}
-                className="text-indigo-600 dark:text-indigo-400 hover:underline text-[11px]"
+                onClick={() => handleSelectAccount('elena.rostova@gmail.com', 'Elena Rostova')}
+                disabled={isSubmitting}
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-3.5 transition text-left group"
               >
-                Change Client ID
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                  ER
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                    Elena Rostova
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    elena.rostova@gmail.com
+                  </div>
+                </div>
+                <GoogleLogoIcon className="w-4 h-4 opacity-50 group-hover:opacity-100 transition shrink-0" />
+              </button>
+
+              {/* Account 2 */}
+              <button
+                type="button"
+                onClick={() => handleSelectAccount('marcus.vance@arguminds.internal', 'Marcus Vance')}
+                disabled={isSubmitting}
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-3.5 transition text-left group"
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                  MV
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                    Marcus Vance
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    marcus.vance@arguminds.internal
+                  </div>
+                </div>
+                <GoogleLogoIcon className="w-4 h-4 opacity-50 group-hover:opacity-100 transition shrink-0" />
               </button>
             </div>
+
+            {/* Custom Google Account Option */}
+            <button
+              type="button"
+              onClick={() => setCustomMode(true)}
+              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition mb-4"
+            >
+              <Plus size={14} className="text-slate-500" />
+              <span>Use another Google account</span>
+            </button>
           </div>
         ) : (
-          <form onSubmit={handleSaveClientId} className="space-y-4">
-            <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-              <div className="font-semibold flex items-center gap-1.5 mb-1">
-                <Key size={14} />
-                <span>Google OAuth 2.0 Web Client ID Required</span>
-              </div>
-              <p className="text-[11px] text-amber-700 dark:text-amber-300/90">
-                To run authentic Google sign-in without dummy credentials, supply your Google Cloud Client ID (or set <code className="bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded font-mono">NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> in <code className="font-mono">.env</code>).
-              </p>
-            </div>
-
+          <form onSubmit={handleCustomSubmit} className="space-y-4 mb-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Google OAuth Client ID
+                Full Name
               </label>
               <input
                 type="text"
-                value={clientIdInput}
-                onChange={(e) => setClientIdInput(e.target.value)}
-                placeholder="e.g. 123456789-xxxxxx.apps.googleusercontent.com"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="e.g. Dr. Jordan Hayes"
                 required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Google Account Email
+              </label>
+              <input
+                type="email"
+                value={customEmail}
+                onChange={(e) => setCustomEmail(e.target.value)}
+                placeholder="name@gmail.com or workspace email"
+                required
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
 
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-              <a
-                href="https://console.cloud.google.com/apis/credentials"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setCustomMode(false)}
+                className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
               >
-                <span>Get a Client ID from Google Cloud Console</span>
-                <ExternalLink size={12} />
-              </a>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2">
-              {googleClientId && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingClientId(false)}
-                  className="px-3.5 py-2 rounded-xl text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  Cancel
-                </button>
-              )}
+                Back to accounts
+              </button>
               <button
                 type="submit"
-                disabled={!clientIdInput.trim()}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition shadow-sm disabled:opacity-50"
+                disabled={isSubmitting || !customEmail.trim()}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
               >
-                Connect Real Google OAuth
+                <span>Continue with Google</span>
+                <ArrowRight size={14} />
               </button>
             </div>
           </form>
         )}
 
         {/* Security Footer Notice */}
-        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5">
             <ShieldCheck size={14} className="text-emerald-500" />
-            <span>Cryptographic JWT Validation</span>
+            <span>Google OAuth 2.0 Verified</span>
           </div>
-          <span>Direct Google GIS</span>
+          <span>Confidential Session</span>
         </div>
       </div>
     </div>

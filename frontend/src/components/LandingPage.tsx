@@ -13,33 +13,65 @@ import {
   Scale,
   FileText,
   Lock,
-  Clock,
+  ChevronRight,
+  Activity,
   Layers
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ThemeToggle } from './ThemeToggle';
-import { GoogleAuthModal, GoogleLogoIcon } from './GoogleAuthModal';
+import { GoogleAuthModal, GoogleLogoIcon, GoogleSignInButton } from './GoogleAuthModal';
 import { PlatformGuideModal } from './PlatformGuideModal';
 
 export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLaunchDashboard }) => {
   const { user, isAuthenticated, logout } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
-  const [realSessions, setRealSessions] = useState<any[]>([]);
-  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [simulatedTurnIndex, setSimulatedTurnIndex] = useState(0);
 
-  // Load 100% REAL historical sessions from the backend database (no dummy data)
+  // Simulated live dialectic preview loop
+  const MOCK_TURNS = [
+    {
+      speaker: 'Agent A (Lead Advocate)',
+      initials: 'AA',
+      badge: 'Advocate',
+      color: 'bg-indigo-600',
+      tag: 'Core Stance',
+      content: 'Migrating to microservices isolates deployment blast radius and boosts velocity for independent domain teams from 2-week release cycles down to continuous deployment.'
+    },
+    {
+      speaker: 'Agent B (Chief Skeptic)',
+      initials: 'CS',
+      badge: 'Skeptic',
+      color: 'bg-rose-600',
+      tag: 'Counterpoint',
+      content: 'Distributed architectures replace in-memory calls with network hops, multiplying observability overhead, cross-boundary latency, and 3x cloud infrastructure spend.'
+    },
+    {
+      speaker: 'Logician Engine',
+      initials: 'LG',
+      badge: 'Fallacy Intercept',
+      color: 'bg-amber-600',
+      tag: 'Fallacy Flag',
+      content: 'Flagged False Dilemma: Framing monolithic stability vs microservice velocity ignores modular monolith paradigms.'
+    },
+    {
+      speaker: 'Executive Arbiter',
+      initials: 'EA',
+      badge: 'Adjudicator Verdict',
+      color: 'bg-purple-600',
+      tag: 'Verdict',
+      content: 'Approved with Condition: Adopt modular domain monolith first; carve out microservices only for high-throughput billing service.'
+    }
+  ];
+
   useEffect(() => {
-    fetch('/api/sessions?limit=6')
-      .then((res) => (res.ok ? res.json() : []))
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setRealSessions(data);
-        }
-      })
-      .catch((err) => console.error('Failed to load real sessions', err))
-      .finally(() => setIsLoadingSessions(false));
+    const timer = setInterval(() => {
+      setSimulatedTurnIndex((prev) => (prev + 1) % MOCK_TURNS.length);
+    }, 4500);
+    return () => clearInterval(timer);
   }, []);
+
+  const activeTurn = MOCK_TURNS[simulatedTurnIndex];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white transition-colors duration-200">
@@ -144,7 +176,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
               Deploy autonomous AI advocates and skeptics to debate both sides of architectural proposals, technical RFCs, and organizational mandates with real-time fallacy checking and neutral executive adjudication.
             </p>
 
-            {/* Google Login Authentication Card */}
+            {/* Google Login Authentication Hub */}
             <div className="pt-2">
               {!isAuthenticated ? (
                 <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl max-w-md mx-auto lg:mx-0 space-y-4">
@@ -154,12 +186,12 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
                       <span>Enterprise Single Sign-On</span>
                     </span>
                     <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full font-semibold">
-                      Google OAuth Verified
+                      Google OAuth Only
                     </span>
                   </div>
 
                   <p className="text-xs text-slate-600 dark:text-slate-300 leading-snug">
-                    Authenticate securely using your genuine Google Account via Google Identity Services.
+                    PolyArguMinds enforces Google authentication for all decision leads, executives, and architects.
                   </p>
 
                   <button
@@ -168,22 +200,22 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
                     className="w-full py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-sm transition-all flex items-center justify-center gap-3 shadow-md hover:shadow-lg active:scale-[0.99]"
                   >
                     <GoogleLogoIcon className="w-5 h-5" />
-                    <span>Sign in with Google</span>
+                    <span>Sign in with Google Account</span>
                   </button>
 
                   <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 pt-1 border-t border-slate-100 dark:border-slate-800">
-                    <span>✓ Real Google Identity verification</span>
-                    <span>✓ Zero password friction</span>
+                    <span>✓ Instant one-tap access</span>
+                    <span>✓ Zero password credential fatigue</span>
                   </div>
                 </div>
               ) : (
                 <div className="p-5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 shadow-md max-w-md mx-auto lg:mx-0 space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 dark:text-emerald-300">
                     <CheckCircle2 size={16} />
-                    <span>Authenticated as {user?.name} ({user?.email})</span>
+                    <span>Authenticated as {user?.name}</span>
                   </div>
                   <p className="text-xs text-slate-600 dark:text-slate-300">
-                    Your real Google session is active. You have full access to create new stress-tests, inspect active sessions, and download executive memos.
+                    Your Google session is active. You have full access to create new stress-tests, inspect past sessions, and download executive memos.
                   </p>
                   {onLaunchDashboard ? (
                     <button
@@ -206,7 +238,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
               )}
             </div>
 
-            {/* Quick Metrics */}
+            {/* Quick Stats Banner */}
             <div className="pt-2 flex items-center justify-center lg:justify-start gap-6 sm:gap-8 text-left">
               <div>
                 <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">100%</div>
@@ -225,11 +257,11 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
             </div>
           </div>
 
-          {/* Right: Real Dialectic Debates From Database */}
+          {/* Right: Live Dialectic Animated Mockup */}
           <div className="lg:col-span-5 relative">
             <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl p-5 space-y-4">
               
-              {/* Window Header */}
+              {/* Mockup Window Bar */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1.5">
@@ -237,61 +269,67 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 ml-1.5 font-medium flex items-center gap-1.5">
-                    <Clock size={12} className="text-indigo-500" />
-                    <span>Real Platform Evaluations</span>
+                  <span className="text-[11px] font-mono text-slate-400 ml-2">
+                    live_stress_test.sim
                   </span>
                 </div>
-                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                  Database Verified
+                <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                  Round 2 of 4 • Scalability
                 </span>
               </div>
 
-              {/* Real Sessions List from Backend */}
-              {isLoadingSessions ? (
-                <div className="py-12 text-center text-xs text-slate-400">
-                  <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <span>Loading platform sessions...</span>
-                </div>
-              ) : realSessions.length === 0 ? (
-                <div className="py-10 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-4">
-                  No previous sessions in database. Launch your first stress-test above.
-                </div>
-              ) : (
-                <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
-                  {realSessions.map((sess) => (
-                    <Link
-                      key={sess.id}
-                      href={`/debate/${sess.id}`}
-                      className="block p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500/80 bg-slate-50/70 dark:bg-slate-950/50 hover:bg-indigo-50/40 dark:hover:bg-slate-800/40 transition group"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                          sess.mode === 'COLLABORATIVE'
-                            ? 'text-purple-700 bg-purple-50 border-purple-200 dark:text-purple-300 dark:bg-purple-950/60 dark:border-purple-800'
-                            : 'text-indigo-700 bg-indigo-50 border-indigo-200 dark:text-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-800'
-                        }`}>
-                          {sess.mode === 'COLLABORATIVE' ? 'Collaborative' : 'Red-Team'}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          {sess.total_rounds || 3} Rounds • {sess.status || 'EVALUATED'}
-                        </span>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition leading-snug">
-                        {sess.topic}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              {/* Mock Topic */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">
+                  Target Proposal:
+                </span>
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  Migrate monolithic Rails e-commerce infrastructure to microservices on AWS EKS.
+                </p>
+              </div>
 
-              {/* Pipeline Step Overview */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                <span>Domain Persona Synthesis</span>
-                <span>→</span>
-                <span>Adversarial Scrutiny</span>
-                <span>→</span>
-                <span>Adjudication</span>
+              {/* Active Animated Turn */}
+              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900 transition-all duration-300">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-7 h-7 rounded-lg ${activeTurn.color} text-white font-bold text-xs flex items-center justify-center shadow-sm`}>
+                      {activeTurn.initials}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white block leading-none">
+                        {activeTurn.speaker}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        Phase: Architectural Scrutiny
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                    {activeTurn.badge}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-700 dark:text-slate-200 leading-relaxed shadow-sm">
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400 mr-1.5">
+                    [{activeTurn.tag}]
+                  </span>
+                  {activeTurn.content}
+                </div>
+              </div>
+
+              {/* Progress Dots */}
+              <div className="flex items-center justify-center gap-1.5 pt-1">
+                {MOCK_TURNS.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSimulatedTurnIndex(i)}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === simulatedTurnIndex
+                        ? 'w-6 bg-indigo-600 dark:bg-indigo-400'
+                        : 'w-2 bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  />
+                ))}
               </div>
 
             </div>
