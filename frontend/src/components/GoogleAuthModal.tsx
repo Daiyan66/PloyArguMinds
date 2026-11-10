@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, UserCheck, Plus, ArrowRight, ShieldCheck } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const GoogleLogoIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -31,201 +31,214 @@ export const GoogleAuthModal: React.FC<{ isOpen: boolean; onClose: () => void; o
   onSuccess
 }) => {
   const { loginWithGoogle } = useAuth();
-  const [customMode, setCustomMode] = useState(false);
-  const [customName, setCustomName] = useState('');
-  const [customEmail, setCustomEmail] = useState('');
+  const [emailOrPhone, setEmailOrPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSelectAccount = (email: string, name: string) => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = emailOrPhone.trim();
+    if (!cleanEmail) {
+      setError('Enter an email or phone number');
+      return;
+    }
+
     setIsSubmitting(true);
+    setError('');
+
+    // Normalize email format
+    const formattedEmail = cleanEmail.includes('@') ? cleanEmail : `${cleanEmail.replace(/\s+/g, '')}@gmail.com`;
+    const derivedName = formattedEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
     setTimeout(() => {
-      loginWithGoogle(email, name);
+      loginWithGoogle(formattedEmail, derivedName);
       setIsSubmitting(false);
       onClose();
       if (onSuccess) onSuccess();
-    }, 400);
+    }, 450);
   };
 
-  const handleCustomSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customEmail.trim()) return;
+  const handleQuickDemo = (demoEmail: string, demoName: string) => {
     setIsSubmitting(true);
     setTimeout(() => {
-      loginWithGoogle(customEmail.trim(), customName.trim() || undefined);
+      loginWithGoogle(demoEmail, demoName);
       setIsSubmitting(false);
       onClose();
       if (onSuccess) onSuccess();
-    }, 400);
+    }, 350);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl relative text-slate-900 dark:text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl text-slate-800">
         
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-        >
-          <X size={20} />
-        </button>
+        {/* Main Google Accounts Styled Card */}
+        <div className="bg-white rounded-3xl sm:rounded-[28px] border border-slate-200 shadow-2xl p-6 sm:p-10 relative overflow-hidden">
+          
+          {/* Close Modal Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition"
+            title="Close"
+          >
+            <X size={20} />
+          </button>
 
-        {/* Google Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex p-3 rounded-2xl bg-slate-100 dark:bg-slate-800/80 mb-3.5 shadow-sm">
-            <GoogleLogoIcon className="w-8 h-8" />
+          {/* Top Bar: Google G Logo + 'Sign in with Google' */}
+          <div className="flex items-center gap-2.5 mb-8">
+            <GoogleLogoIcon className="w-5 h-5 shrink-0" />
+            <span className="text-sm font-normal text-slate-600 tracking-normal">
+              Sign in with Google
+            </span>
           </div>
-          <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Sign in with Google
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            to continue to <strong className="font-semibold text-slate-700 dark:text-slate-200">PolyArguMinds Executive Engine</strong>
-          </p>
-        </div>
 
-        {!customMode ? (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3 px-1">
-              Choose an account
-            </p>
+          {/* 2-Column Grid Matching the Official Google Sign-In Screen */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+            
+            {/* Left Column: App Brand Mark & Headings */}
+            <div className="md:col-span-5 space-y-4">
+              {/* Brand Leaf / Shield Icon */}
+              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white shadow-sm">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+                  <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+                </svg>
+              </div>
 
-            <div className="space-y-2 mb-4">
-              {/* Account 1 */}
-              <button
-                type="button"
-                onClick={() => handleSelectAccount('elena.rostova@gmail.com', 'Elena Rostova')}
-                disabled={isSubmitting}
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-3.5 transition text-left group"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
-                  ER
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                    Elena Rostova
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    elena.rostova@gmail.com
-                  </div>
-                </div>
-                <GoogleLogoIcon className="w-4 h-4 opacity-50 group-hover:opacity-100 transition shrink-0" />
-              </button>
+              <div>
+                <h2 className="text-3xl sm:text-[34px] font-normal text-slate-900 tracking-tight leading-tight">
+                  Sign in
+                </h2>
+                <p className="text-sm text-slate-700 mt-2">
+                  to continue to{' '}
+                  <span className="text-[#0b57d0] font-medium hover:underline cursor-pointer">
+                    PolyArguMinds, Inc.
+                  </span>
+                </p>
+              </div>
 
-              {/* Account 2 */}
-              <button
-                type="button"
-                onClick={() => handleSelectAccount('marcus.vance@arguminds.internal', 'Marcus Vance')}
-                disabled={isSubmitting}
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-3.5 transition text-left group"
-              >
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
-                  MV
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                    Marcus Vance
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {/* Quick Select Shortcut for convenience */}
+              <div className="pt-2 hidden md:block">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  Fast Demo Select:
+                </span>
+                <div className="space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemo('marcus.vance@arguminds.internal', 'Marcus Vance')}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-[#0b57d0] hover:bg-blue-50/50 text-xs text-slate-700 truncate transition"
+                  >
                     marcus.vance@arguminds.internal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemo('elena.rostova@gmail.com', 'Elena Rostova')}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-[#0b57d0] hover:bg-blue-50/50 text-xs text-slate-700 truncate transition"
+                  >
+                    elena.rostova@gmail.com
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Google Input Field & Action Buttons */}
+            <div className="md:col-span-7">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                
+                {/* Outlined Floating Input */}
+                <div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="googleEmailInput"
+                      value={emailOrPhone}
+                      onChange={(e) => {
+                        setEmailOrPhone(e.target.value);
+                        if (error) setError('');
+                      }}
+                      placeholder="Email or phone"
+                      autoFocus
+                      className={`w-full px-4 py-3.5 rounded-md border ${
+                        error ? 'border-red-600 focus:border-red-600' : 'border-slate-400 focus:border-[#0b57d0]'
+                      } text-sm text-slate-900 placeholder:text-slate-500 bg-white focus:outline-none focus:ring-1 ${
+                        error ? 'focus:ring-red-600' : 'focus:ring-[#0b57d0]'
+                      } transition`}
+                    />
+                  </div>
+
+                  {error ? (
+                    <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1 font-medium">
+                      <span>⚠</span> {error}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-2 text-left">
+                    <button
+                      type="button"
+                      onClick={() => setEmailOrPhone('decision.architect@gmail.com')}
+                      className="text-xs font-semibold text-[#0b57d0] hover:underline"
+                    >
+                      Forgot email?
+                    </button>
                   </div>
                 </div>
-                <GoogleLogoIcon className="w-4 h-4 opacity-50 group-hover:opacity-100 transition shrink-0" />
-              </button>
+
+                {/* Privacy and Terms Notice */}
+                <p className="text-xs text-slate-600 leading-relaxed text-left">
+                  Before using this app, you can review PolyArguMinds, Inc.&apos;s{' '}
+                  <span className="text-[#0b57d0] hover:underline cursor-pointer">
+                    Privacy Policy
+                  </span>{' '}
+                  and{' '}
+                  <span className="text-[#0b57d0] hover:underline cursor-pointer">
+                    Terms of Service
+                  </span>
+                  .
+                </p>
+
+                {/* Bottom Row Actions */}
+                <div className="flex items-center justify-between pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setEmailOrPhone('new.executive@gmail.com')}
+                    className="text-xs sm:text-sm font-semibold text-[#0b57d0] hover:underline px-1 py-1"
+                  >
+                    Create account
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="px-6 py-2.5 rounded-full bg-[#0b57d0] hover:bg-[#0842a0] text-white font-medium text-xs sm:text-sm transition-all shadow-sm hover:shadow active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Checking...' : 'Next'}
+                  </button>
+                </div>
+
+              </form>
             </div>
 
-            {/* Custom Google Account Option */}
-            <button
-              type="button"
-              onClick={() => setCustomMode(true)}
-              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition mb-4"
-            >
-              <Plus size={14} className="text-slate-500" />
-              <span>Use another Google account</span>
-            </button>
           </div>
-        ) : (
-          <form onSubmit={handleCustomSubmit} className="space-y-4 mb-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
-                placeholder="e.g. Dr. Jordan Hayes"
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Google Account Email
-              </label>
-              <input
-                type="email"
-                value={customEmail}
-                onChange={(e) => setCustomEmail(e.target.value)}
-                placeholder="name@gmail.com or workspace email"
-                required
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              />
-            </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => setCustomMode(false)}
-                className="text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-              >
-                Back to accounts
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting || !customEmail.trim()}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-              >
-                <span>Continue with Google</span>
-                <ArrowRight size={14} />
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Security Footer Notice */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-emerald-500" />
-            <span>Google OAuth 2.0 Verified</span>
-          </div>
-          <span>Confidential Session</span>
         </div>
+
+        {/* Outer Footer: Language + Google Help / Privacy / Terms Links */}
+        <div className="flex items-center justify-between px-3 pt-3 text-[11px] text-slate-500">
+          <div className="flex items-center gap-1 hover:text-slate-700 cursor-pointer">
+            <span>English (United States)</span>
+            <ChevronDown size={12} />
+          </div>
+
+          <div className="flex items-center gap-6">
+            <span className="hover:text-slate-700 cursor-pointer">Help</span>
+            <span className="hover:text-slate-700 cursor-pointer">Privacy</span>
+            <span className="hover:text-slate-700 cursor-pointer">Terms</span>
+          </div>
+        </div>
+
       </div>
     </div>
-  );
-};
-
-export const GoogleSignInButton: React.FC<{
-  onClick?: () => void;
-  className?: string;
-  size?: 'sm' | 'md' | 'lg';
-}> = ({ onClick, className = '', size = 'md' }) => {
-  const sizeClasses = {
-    sm: 'px-3.5 py-2 text-xs gap-2',
-    md: 'px-4 py-2.5 text-sm gap-2.5',
-    lg: 'px-6 py-3.5 text-base gap-3'
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-100 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all font-semibold shadow-sm hover:shadow active:scale-[0.99] ${sizeClasses[size]} ${className}`}
-    >
-      <GoogleLogoIcon className={size === 'lg' ? 'w-5 h-5' : 'w-4 h-4'} />
-      <span>Continue with Google</span>
-    </button>
   );
 };
