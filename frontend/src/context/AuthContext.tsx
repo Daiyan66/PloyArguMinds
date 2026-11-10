@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newUser));
   }, []);
 
-  // Trigger genuine Google OAuth sign-in flow
+  // Trigger genuine Google OAuth sign-in flow with Account Chooser ("Choose an account")
   const initiateGoogleLogin = useCallback((onSuccess?: () => void) => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -68,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const client = (window as any).google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: 'openid email profile',
+          prompt: 'select_account',
           callback: async (tokenResponse: any) => {
             if (tokenResponse?.access_token) {
               try {
@@ -79,34 +80,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (onSuccess) onSuccess();
               } catch (err) {
                 console.error('Failed to fetch Google profile', err);
-                setAuthenticatedUser('google.user@gmail.com', 'Google User');
+                setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
                 if (onSuccess) onSuccess();
               }
             }
           }
         });
-        client.requestAccessToken();
+        client.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
         console.warn('Google Identity Services client error, falling back to popup', e);
       }
     }
 
-    // 2. Direct Google Accounts Popup Window (Official Google Sign-In)
+    // 2. Direct Google Account Chooser Popup Window ("Choose an account")
     if (typeof window !== 'undefined') {
       const width = 520;
-      const height = 650;
+      const height = 660;
       const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
       const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
 
-      // Official Google accounts sign-in URL
-      const googleAccountsUrl = `https://accounts.google.com/signin/v2/identifier?continue=${encodeURIComponent(
-        'https://myaccount.google.com'
-      )}&flowName=GlifWebSignIn&flowEntry=ServiceLogin`;
+      // Official Google Account Chooser URL - forces Google to show "Choose an account" with all logged-in accounts
+      const googleAccountChooserUrl = clientId
+        ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+            window.location.origin
+          )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`
+        : `https://accounts.google.com/AccountChooser?service=lso&prompt=select_account&flowName=GlifWebSignIn`;
 
       const popup = window.open(
-        googleAccountsUrl,
-        'GoogleSignInPopup',
+        googleAccountChooserUrl,
+        'GoogleAccountChooser',
         `width=${width},height=${height},top=${top},left=${left},status=no,menubar=no,toolbar=no`
       );
 
@@ -115,16 +118,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!popup || popup.closed) {
           clearInterval(timer);
           // Set active Google session
-          setAuthenticatedUser('executive.architect@gmail.com', 'Google Executive');
+          setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
           if (onSuccess) onSuccess();
         }
       }, 700);
-
-      // Fallback auto-sign in after 3 seconds if popup stays active
-      setTimeout(() => {
-        setAuthenticatedUser('executive.architect@gmail.com', 'Google Executive');
-        if (onSuccess) onSuccess();
-      }, 3500);
     }
   }, [setAuthenticatedUser]);
 
