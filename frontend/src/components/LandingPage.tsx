@@ -8,23 +8,17 @@ import {
   Cpu,
   ArrowRight,
   BookOpen,
-  Sparkles,
-  CheckCircle2,
   Scale,
   FileText,
-  Lock,
-  ChevronRight,
-  Activity,
-  Layers
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ThemeToggle } from './ThemeToggle';
-import { GoogleAuthModal, GoogleLogoIcon } from './GoogleAuthModal';
+import { GoogleLogoIcon } from './GoogleAuthModal';
 import { PlatformGuideModal } from './PlatformGuideModal';
 
 export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLaunchDashboard }) => {
-  const { user, isAuthenticated, logout } = useAuth();
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { user, isAuthenticated, logout, initiateGoogleLogin } = useAuth();
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [simulatedTurnIndex, setSimulatedTurnIndex] = useState(0);
 
@@ -72,6 +66,12 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
   }, []);
 
   const activeTurn = MOCK_TURNS[simulatedTurnIndex];
+
+  const handleLoginClick = () => {
+    initiateGoogleLogin(() => {
+      if (onLaunchDashboard) onLaunchDashboard();
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 flex flex-col justify-between selection:bg-indigo-500 selection:text-white transition-colors duration-200 relative overflow-hidden">
@@ -154,7 +154,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
             ) : (
               <button
                 type="button"
-                onClick={() => setShowAuthModal(true)}
+                onClick={handleLoginClick}
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#0b57d0] hover:bg-[#0842a0] text-white text-xs font-semibold shadow-sm transition"
               >
                 <GoogleLogoIcon className="w-3.5 h-3.5" />
@@ -184,7 +184,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
               {!isAuthenticated ? (
                 <button
                   type="button"
-                  onClick={() => setShowAuthModal(true)}
+                  onClick={handleLoginClick}
                   className="inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-[#0b57d0] hover:bg-[#0842a0] text-white font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95"
                 >
                   <GoogleLogoIcon className="w-4 h-4 bg-white rounded-full p-0.5" />
@@ -208,7 +208,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
             Deploy autonomous AI advocates and skeptics to debate both sides of architectural proposals, technical RFCs, and organizational mandates with real-time fallacy checking and neutral executive adjudication.
           </p>
 
-          {/* Two-Column Grid: Highlights / Value Prop & Live Dialectic Simulation Card */}
+          {/* Two-Column Grid: Highlights & Live Dialectic Simulation Card */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
             
             {/* Left Highlights & Quick Action */}
@@ -259,16 +259,16 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
               <div className="p-4 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-4">
                 <div className="text-xs">
                   <span className="font-semibold text-slate-800 dark:text-slate-200 block">
-                    {isAuthenticated ? `Signed in as ${user?.name}` : 'Google Authentication Required'}
+                    {isAuthenticated ? `Signed in as ${user?.name}` : 'Google Authentication'}
                   </span>
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {isAuthenticated ? 'Open your executive workspace to begin testing.' : 'One-click sign in with your Google account.'}
+                    {isAuthenticated ? 'Open your executive workspace to begin testing.' : 'Sign in using your Google account to unlock the engine.'}
                   </span>
                 </div>
                 {!isAuthenticated ? (
                   <button
                     type="button"
-                    onClick={() => setShowAuthModal(true)}
+                    onClick={handleLoginClick}
                     className="px-4 py-2 rounded-full bg-[#0b57d0] hover:bg-[#0842a0] text-white text-xs font-semibold shrink-0 transition shadow-sm"
                   >
                     Login
@@ -403,7 +403,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
             </button>
             <span>•</span>
             <button
-              onClick={() => setShowAuthModal(true)}
+              onClick={handleLoginClick}
               className="hover:text-indigo-600 dark:hover:text-indigo-400 transition"
             >
               Google Authentication
@@ -412,12 +412,7 @@ export const LandingPage: React.FC<{ onLaunchDashboard?: () => void }> = ({ onLa
         </div>
       </footer>
 
-      {/* Modals */}
-      <GoogleAuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={onLaunchDashboard}
-      />
+      {/* Platform Guide Modal */}
       <PlatformGuideModal
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}

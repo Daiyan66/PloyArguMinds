@@ -23,7 +23,7 @@ import { createSession, uploadDocument, deleteSession } from '../../lib/api';
 import { useDebateStore } from '../../stores/debateStore';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
-import { GoogleAuthModal, GoogleLogoIcon } from '../../components/GoogleAuthModal';
+import { GoogleLogoIcon } from '../../components/GoogleAuthModal';
 import { PlatformGuideModal } from '../../components/PlatformGuideModal';
 
 const PRESET_TOPICS = [
@@ -35,7 +35,7 @@ const PRESET_TOPICS = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, initiateGoogleLogin } = useAuth();
   
   const [topic, setTopic] = useState('');
   const [mode, setMode] = useState<'DEBATE' | 'COLLABORATIVE'>('DEBATE');
@@ -79,7 +79,7 @@ export default function DashboardPage() {
     if (!topic.trim()) return;
 
     if (!isAuthenticated) {
-      setShowAuthModal(true);
+      initiateGoogleLogin();
       return;
     }
 
@@ -168,7 +168,7 @@ export default function DashboardPage() {
             ) : (
               <button
                 type="button"
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => initiateGoogleLogin()}
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-sm transition"
               >
                 <GoogleLogoIcon className="w-3.5 h-3.5" />
@@ -499,10 +499,6 @@ export default function DashboardPage() {
       )}
 
       {/* Modals */}
-      <GoogleAuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-      />
       <PlatformGuideModal
         isOpen={showGuideModal}
         onClose={() => setShowGuideModal(false)}
