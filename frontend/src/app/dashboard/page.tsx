@@ -49,16 +49,22 @@ export default function DashboardPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
 
-  const fetchRecent = () => {
-    fetch('/api/sessions?limit=8')
+  const fetchRecent = (currentUserId?: string) => {
+    const uid = currentUserId || user?.id;
+    const query = uid ? `?user_id=${encodeURIComponent(uid)}&limit=15` : '?limit=15';
+    fetch(`/api/sessions${query}`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setRecentSessions(data))
       .catch(() => {});
   };
 
   useEffect(() => {
-    fetchRecent();
-  }, []);
+    if (user?.id) {
+      fetchRecent(user.id);
+    } else {
+      fetchRecent();
+    }
+  }, [user?.id]);
 
   const handleConfirmDelete = async () => {
     if (!sessionToDelete) return;
@@ -86,7 +92,7 @@ export default function DashboardPage() {
     setIsSubmitting(true);
     try {
       useDebateStore.getState().reset();
-      const sess = await createSession(topic.trim(), mode, totalRounds);
+      const sess = await createSession(topic.trim(), mode, totalRounds, user?.id);
       if (file) {
         await uploadDocument(sess.id, file);
       }

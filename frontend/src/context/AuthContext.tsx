@@ -81,22 +81,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Save authenticated user
-  const setAuthenticatedUser = useCallback((email: string, name?: string, avatar?: string) => {
+  // Sync or create user in Supabase PostgreSQL backend
+  const syncWithBackend = async (email: string, name?: string, avatar?: string, googleId?: string) => {
+    try {
+      const res = await fetch('/api/users/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, avatar, google_id: googleId })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn('Backend user sync failed, continuing locally', e);
+    }
+    return null;
+  };
+
+  // Save authenticated user & ensure database persistence
+  const setAuthenticatedUser = useCallback(async (email: string, name?: string, avatar?: string, googleId?: string) => {
     const defaultEmail = email || 'user@gmail.com';
     const defaultName = name || (defaultEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
     const defaultAvatar = avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(defaultName)}&backgroundColor=4f46e5,7c3aed,2563eb`;
 
+    // 1. Sync / auto-create in Supabase PostgreSQL users table
+    const backendUser = await syncWithBackend(defaultEmail, defaultName, defaultAvatar, googleId);
+
     const newUser: User = {
-      id: 'google_' + Math.random().toString(36).substring(2, 11),
-      name: defaultName,
-      email: defaultEmail,
-      avatar: defaultAvatar,
-      role: 'Executive Decision Arbiter'
+      id: backendUser?.id || ('usr_' + Math.random().toString(36).substring(2, 11)),
+      name: backendUser?.name || defaultName,
+      email: backendUser?.email || defaultEmail,
+      avatar: backendUser?.avatar || defaultAvatar,
+      role: backendUser?.role || 'Executive Decision Arbiter'
     };
 
     setUser(newUser);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newUser));
+    return newUser;
   }, []);
 
   // Trigger genuine Google OAuth sign-in flow with Account Chooser ("Choose an account")
@@ -117,11 +138,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
                 });
                 const profile = await res.json();
-                setAuthenticatedUser(profile.email, profile.name, profile.picture);
+                await setAuthenticatedUser(profile.email, profile.name, profile.picture, profile.sub);
                 if (onSuccess) onSuccess();
               } catch (err) {
                 console.error('Failed to fetch Google profile', err);
-                setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
+                await setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
                 if (onSuccess) onSuccess();
               }
             }
@@ -152,10 +173,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         `width=${width},height=${height},top=${top},left=${left},status=no,menubar=no,toolbar=no`
       );
 
-      const timer = setInterval(() => {
+      const timer = setInterval(async () => {
         if (!popup || popup.closed) {
           clearInterval(timer);
-          setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
+          await setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
           if (onSuccess) onSuccess();
         }
       }, 700);

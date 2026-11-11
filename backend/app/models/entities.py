@@ -4,10 +4,27 @@ from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from app.core.db import Base
 
+class UserModel(Base):
+    __tablename__ = "users"
+
+    id = Column(String(64), primary_key=True, default=lambda: f"usr_{uuid.uuid4().hex[:12]}")
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    avatar = Column(Text, nullable=True)
+    google_id = Column(String(128), unique=True, nullable=True, index=True)
+    role = Column(String(64), default="Executive Decision Arbiter")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    sessions = relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
+
+
 class SessionModel(Base):
     __tablename__ = "sessions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(64), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     topic = Column(Text, nullable=False)
     mode = Column(String(32), nullable=False, default="DEBATE")  # 'DEBATE' or 'COLLABORATIVE'
     status = Column(String(32), nullable=False, default="ACTIVE")  # 'ACTIVE', 'PAUSED', 'COMPLETED'
@@ -19,6 +36,7 @@ class SessionModel(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = relationship("UserModel", back_populates="sessions")
     chunks = relationship("DocumentChunkModel", back_populates="session", cascade="all, delete-orphan")
     personas = relationship("PersonaModel", back_populates="session", cascade="all, delete-orphan")
     turns = relationship("TurnModel", back_populates="session", cascade="all, delete-orphan")

@@ -19,6 +19,7 @@ class CreateSessionRequest(BaseModel):
     total_rounds: int = 5
     file_name: Optional[str] = None
     file_url: Optional[str] = None
+    user_id: Optional[str] = None
 
 class InterjectRequest(BaseModel):
     content: str
@@ -29,6 +30,7 @@ class InterjectRequest(BaseModel):
 async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(get_db)):
     session = SessionModel(
         id=str(uuid.uuid4()),
+        user_id=req.user_id,
         topic=req.topic,
         mode=req.mode,
         total_rounds=req.total_rounds,
@@ -45,6 +47,7 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
     from app.core.mongo import save_session_to_mongo
     save_session_to_mongo({
         "id": session.id,
+        "user_id": session.user_id,
         "topic": session.topic,
         "mode": session.mode,
         "total_rounds": session.total_rounds,
@@ -55,6 +58,7 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
 
     return {
         "id": session.id,
+        "user_id": session.user_id,
         "topic": session.topic,
         "mode": session.mode,
         "total_rounds": session.total_rounds,
@@ -64,13 +68,17 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
     }
 
 @router.get("")
-async def list_sessions(limit: int = 20, db: AsyncSession = Depends(get_db)):
-    stmt = select(SessionModel).order_by(SessionModel.created_at.desc()).limit(limit)
+async def list_sessions(user_id: Optional[str] = Query(None), limit: int = 20, db: AsyncSession = Depends(get_db)):
+    stmt = select(SessionModel)
+    if user_id:
+        stmt = stmt.where(SessionModel.user_id == user_id)
+    stmt = stmt.order_by(SessionModel.created_at.desc()).limit(limit)
     res = await db.execute(stmt)
     sessions = res.scalars().all()
     return [
         {
             "id": s.id,
+            "user_id": s.user_id,
             "topic": s.topic,
             "mode": s.mode,
             "status": s.status,
@@ -106,6 +114,7 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
 
     return {
         "id": session.id,
+        "user_id": session.user_id,
         "topic": session.topic,
         "mode": session.mode,
         "status": session.status,

@@ -6,6 +6,7 @@ from app.core.db import init_db
 from app.api.routes_sessions import router as sessions_router
 from app.api.routes_stream import router as stream_router
 from app.api.routes_files import router as files_router
+from app.api.routes_users import router as users_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +31,7 @@ app.add_middleware(
 )
 
 # Mount Routes
+app.include_router(users_router)
 app.include_router(sessions_router)
 app.include_router(stream_router)
 app.include_router(files_router)

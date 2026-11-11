@@ -37,6 +37,7 @@ async def get_db():
             await session.close()
 
 async def init_db():
+    import app.models.entities  # Registers UserModel, SessionModel, etc. on Base.metadata
     async with engine.begin() as conn:
         # If postgres, enable vector extension if available
         if "postgresql" in db_url:

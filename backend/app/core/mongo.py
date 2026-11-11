@@ -102,6 +102,30 @@ def save_turn_to_mongo(session_id: str, turn_data: Dict[str, Any]):
     except Exception:
         pass
 
+
+def _sync_save_user(user_data: Dict[str, Any]):
+    try:
+        db = get_mongo_db()
+        if db is not None:
+            db.users.update_one(
+                {"email": user_data.get("email")},
+                {"$set": user_data},
+                upsert=True
+            )
+    except Exception as e:
+        print(f"MongoDB save user warning: {e}")
+
+
+def save_user_to_mongo(user_data: Dict[str, Any]):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.run_in_executor(None, _sync_save_user, user_data)
+        else:
+            _sync_save_user(user_data)
+    except Exception:
+        pass
+
 def save_verdict_to_mongo(session_id: str, verdict_data: Dict[str, Any]):
     # Non-blocking fire-and-forget
     try:

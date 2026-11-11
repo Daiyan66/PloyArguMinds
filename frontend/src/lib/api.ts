@@ -2,11 +2,16 @@ import { SessionData } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
-export async function createSession(topic: string, mode: string = 'DEBATE', totalRounds: number = 5): Promise<{ id: string }> {
+export async function createSession(
+  topic: string,
+  mode: string = 'DEBATE',
+  totalRounds: number = 5,
+  userId?: string
+): Promise<{ id: string }> {
   const res = await fetch(`${API_BASE}/api/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ topic, mode, total_rounds: totalRounds })
+    body: JSON.stringify({ topic, mode, total_rounds: totalRounds, user_id: userId })
   });
   if (!res.ok) {
     throw new Error(`Failed to create session: ${res.statusText}`);
