@@ -1,9 +1,16 @@
 # Environment & Secrets
 .env
 *.env
+*.env.*
+.env.*
+**/.env*
 *.db
 polyarguminds.db
 uploads/
+client_secret*.json
+credentials*.json
+*.credentials.json
+service_account*.json
 
 # Python
 __pycache__/
