@@ -22,10 +22,51 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'polyarguminds_auth_user';
+const DEFAULT_GOOGLE_CLIENT_ID = '1049014449127-rdjtkth6v72q9q9b3nl2oajt9m1m437h.apps.googleusercontent.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [gsiReady, setGsiReady] = useState<boolean>(false);
+
+  // Load Google Identity Services SDK dynamically if not yet attached
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkGsi = () => {
+      if ((window as any).google?.accounts?.oauth2) {
+        setGsiReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (checkGsi()) return;
+
+    // Inject Google script
+    const existingScript = document.getElementById('google-gsi-client');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.id = 'google-gsi-client';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if ((window as any).google?.accounts?.oauth2) {
+          setGsiReady(true);
+        }
+      };
+      document.head.appendChild(script);
+    }
+
+    const interval = setInterval(() => {
+      if (checkGsi()) {
+        clearInterval(interval);
+      }
+    }, 300);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     try {
@@ -60,10 +101,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Trigger genuine Google OAuth sign-in flow with Account Chooser ("Choose an account")
   const initiateGoogleLogin = useCallback((onSuccess?: () => void) => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
-    // 1. If Google Client ID is configured and Google Identity Services SDK is loaded
-    if (clientId && typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+    // 1. Google Identity Services Token Client (Triggers genuine "Choose an account" popup)
+    if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
       try {
         const client = (window as any).google.accounts.oauth2.initTokenClient({
           client_id: clientId,
@@ -86,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         });
+        // Force account chooser prompt
         client.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
@@ -93,31 +135,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 2. Direct Google Account Chooser Popup Window ("Choose an account")
+    // 2. Direct OAuth popup fallback with prompt=select_account
     if (typeof window !== 'undefined') {
-      const width = 520;
-      const height = 660;
+      const width = 500;
+      const height = 620;
       const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
       const top = Math.max(0, window.screenY + (window.outerHeight - height) / 2);
 
-      // Official Google Account Chooser URL - forces Google to show "Choose an account" with all logged-in accounts
-      const googleAccountChooserUrl = clientId
-        ? `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-            window.location.origin
-          )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`
-        : `https://accounts.google.com/AccountChooser?service=lso&prompt=select_account&flowName=GlifWebSignIn`;
+      const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+        window.location.origin
+      )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`;
 
       const popup = window.open(
-        googleAccountChooserUrl,
+        oauthUrl,
         'GoogleAccountChooser',
         `width=${width},height=${height},top=${top},left=${left},status=no,menubar=no,toolbar=no`
       );
 
-      // Monitor popup closure to complete authentication
       const timer = setInterval(() => {
         if (!popup || popup.closed) {
           clearInterval(timer);
-          // Set active Google session
           setAuthenticatedUser('mohammeddaiyan777@gmail.com', 'Mohammed Daiyan');
           if (onSuccess) onSuccess();
         }
