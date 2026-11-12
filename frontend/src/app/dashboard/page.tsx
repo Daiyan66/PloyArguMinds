@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   BookOpen,
   LogOut,
-  Sparkles
+  Sparkles,
+  Search
 } from 'lucide-react';
 import { createSession, uploadDocument, deleteSession } from '../../lib/api';
 import { useDebateStore } from '../../stores/debateStore';
@@ -45,6 +46,8 @@ export default function DashboardPage() {
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [sessionToDelete, setSessionToDelete] = useState<{ id: string; topic: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<'ALL' | 'DEBATE' | 'COLLABORATIVE'>('ALL');
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
