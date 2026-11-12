@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -18,7 +18,11 @@ import {
   BookOpen,
   LogOut,
   Sparkles,
-  Search
+  Search,
+  Filter,
+  Tag,
+  CheckCircle2,
+  RotateCcw
 } from 'lucide-react';
 import { createSession, uploadDocument, deleteSession } from '../../lib/api';
 import { useDebateStore } from '../../stores/debateStore';
@@ -46,11 +50,107 @@ export default function DashboardPage() {
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [sessionToDelete, setSessionToDelete] = useState<{ id: string; topic: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<'ALL' | 'DEBATE' | 'COLLABORATIVE'>('ALL');
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
+
+  // Search & Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<'ALL' | 'DEBATE' | 'COLLABORATIVE'>('ALL');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
+  const [selectedTag, setSelectedTag] = useState<string>('ALL');
+
+  // Topic classification helper
+  const inferTopicTags = (topicText: string): string[] => {
+    if (!topicText) return ['General'];
+    const text = topicText.toLowerCase();
+    const tags: string[] = [];
+    if (text.includes('microservice') || text.includes('monolith') || text.includes('architecture') || text.includes('aws') || text.includes('eks') || text.includes('cloud')) {
+      tags.push('Architecture');
+    }
+    if (text.includes('rust') || text.includes('go') || text.includes('python') || text.includes('code') || text.includes('engineering') || text.includes('platform')) {
+      tags.push('Engineering');
+    }
+    if (text.includes('llm') || text.includes('ai') || text.includes('agent') || text.includes('agentic') || text.includes('gpt') || text.includes('model')) {
+      tags.push('AI & ML');
+    }
+    if (text.includes('rto') || text.includes('office') || text.includes('mandate') || text.includes('team') || text.includes('policy') || text.includes('work')) {
+      tags.push('Policy');
+    }
+    if (text.includes('security') || text.includes('auth') || text.includes('governance') || text.includes('compliance')) {
+      tags.push('Security');
+    }
+    if (tags.length === 0) {
+      tags.push('Strategy');
+    }
+    return tags;
+  };
+
+  // Human-readable relative timestamp helper
+  const formatRelativeTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+      if (diffSec < 60) return 'Just now';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch {
+      return '';
+    }
+  };
+
+  // Derive unique tags from user sessions
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    recentSessions.forEach((s) => {
+      inferTopicTags(s.topic).forEach((t) => tagSet.add(t));
+    });
+    return Array.from(tagSet);
+  }, [recentSessions]);
+
+  // Filtered session list based on search, mode, status, and tag
+  const filteredSessions = useMemo(() => {
+    return recentSessions.filter((s) => {
+      // 1. Search query match
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesTopic = s.topic?.toLowerCase().includes(q);
+        const matchesTags = inferTopicTags(s.topic).some((t) => t.toLowerCase().includes(q));
+        if (!matchesTopic && !matchesTags) return false;
+      }
+
+      // 2. Mode match
+      if (filterMode !== 'ALL' && s.mode !== filterMode) {
+        return false;
+      }
+
+      // 3. Status match
+      if (filterStatus !== 'ALL') {
+        const sStatus = s.status || 'ACTIVE';
+        if (sStatus !== filterStatus) return false;
+      }
+
+      // 4. Tag match
+      if (selectedTag !== 'ALL') {
+        const tags = inferTopicTags(s.topic);
+        if (!tags.includes(selectedTag)) return false;
+      }
+
+      return true;
+    });
+  }, [recentSessions, searchQuery, filterMode, filterStatus, selectedTag]);
+
+  const hasActiveFilters = searchQuery.trim() !== '' || filterMode !== 'ALL' || filterStatus !== 'ALL' || selectedTag !== 'ALL';
+
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setFilterMode('ALL');
+    setFilterStatus('ALL');
+    setSelectedTag('ALL');
+  };
 
   const fetchRecent = (currentUserId?: string) => {
     const uid = currentUserId || user?.id;
@@ -386,68 +486,270 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Recent Sessions List */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Clock size={14} className="text-indigo-600 dark:text-indigo-400" />
-                  <span>Recent Evaluations & Debates</span>
-                </h3>
-                <span className="text-xs text-slate-400 font-mono">
-                  {recentSessions.length} total
-                </span>
+            {/* Recent Sessions List with Live Search, Filter & Tagging */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center gap-2">
+                  <Clock size={15} className="text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    Evaluations & Debates
+                  </h3>
+                  <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                    {filteredSessions.length} {filteredSessions.length === 1 ? 'debate' : 'debates'}
+                  </span>
+                </div>
+
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 self-start sm:self-auto"
+                  >
+                    <RotateCcw size={11} />
+                    <span>Reset filters</span>
+                  </button>
+                )}
               </div>
 
+              {/* SEARCH & FILTERS CONTROLS */}
+              <div className="space-y-3">
+                {/* 1. Search Bar */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by topic, keyword, or tag..."
+                    className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* 2. Filter Pills Row: Mode & Status */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Mode Pills */}
+                  <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('ALL')}
+                      className={`px-2 py-1 rounded-md font-medium transition ${
+                        filterMode === 'ALL'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      All Modes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('DEBATE')}
+                      className={`px-2 py-1 rounded-md font-medium transition ${
+                        filterMode === 'DEBATE'
+                          ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Red-Team
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilterMode('COLLABORATIVE')}
+                      className={`px-2 py-1 rounded-md font-medium transition ${
+                        filterMode === 'COLLABORATIVE'
+                          ? 'bg-white dark:bg-slate-900 text-purple-600 dark:text-purple-400 shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Collaborative
+                    </button>
+                  </div>
+
+                  {/* Status Pills */}
+                  <div className="inline-flex p-0.5 bg-slate-100 dark:bg-slate-800/80 rounded-lg text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setFilterStatus('ALL')}
+                      className={`px-2 py-1 rounded-md font-medium transition ${
+                        filterStatus === 'ALL'
+                          ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      All Status
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilterStatus('ACTIVE')}
+                      className={`px-2 py-1 rounded-md font-medium transition ${
+                        filterStatus === 'ACTIVE'
+                          ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFilterStatus('COMPLETED')}
+                      className={`px-2 py-1 rounded-md font-medium transition ${
+                        filterStatus === 'COMPLETED'
+                          ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Completed
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Category Tags Row */}
+                {availableTags.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+                    <span className="text-slate-400 shrink-0 flex items-center gap-1 font-medium text-[10px] uppercase tracking-wider">
+                      <Tag size={11} />
+                      <span>Topic:</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTag('ALL')}
+                      className={`px-2 py-0.5 rounded-full shrink-0 border transition ${
+                        selectedTag === 'ALL'
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-semibold'
+                          : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {availableTags.map((tagName) => (
+                      <button
+                        key={tagName}
+                        type="button"
+                        onClick={() => setSelectedTag(selectedTag === tagName ? 'ALL' : tagName)}
+                        className={`px-2 py-0.5 rounded-full shrink-0 border transition ${
+                          selectedTag === tagName
+                            ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-semibold'
+                            : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        #{tagName}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* LIST OF SESSIONS */}
               {recentSessions.length === 0 ? (
-                <div className="text-center py-8 text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
+                <div className="text-center py-10 text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
                   No sessions evaluated yet. Start your first dialectic stress-test above.
                 </div>
+              ) : filteredSessions.length === 0 ? (
+                <div className="text-center py-10 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    No debates found matching <span className="font-semibold text-slate-700 dark:text-slate-200">"{searchQuery || selectedTag}"</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 font-medium text-xs transition"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Clear all filters</span>
+                  </button>
+                </div>
               ) : (
-                <div className="space-y-2.5">
-                  {recentSessions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50/50 dark:bg-slate-950/40 flex items-center justify-between gap-3 transition group"
-                    >
-                      <Link
-                        href={`/debate/${s.id}`}
-                        className="min-w-0 flex-1 flex items-center gap-2.5"
-                      >
-                        <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${
-                            s.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
-                          }`}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
-                            {s.topic}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              {s.mode === 'COLLABORATIVE' ? 'Collaborative' : 'Red-Team'} • {s.total_rounds || 3} Rds
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
+                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                  {filteredSessions.map((s) => {
+                    const tags = inferTopicTags(s.topic);
+                    const isCompleted = s.status === 'COMPLETED';
+                    const relativeTime = formatRelativeTime(s.created_at);
 
-                      <div className="flex items-center gap-2 shrink-0">
+                    return (
+                      <div
+                        key={s.id}
+                        className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 bg-slate-50/50 dark:bg-slate-950/40 hover:bg-white dark:hover:bg-slate-900/80 flex items-center justify-between gap-3 transition group shadow-xs"
+                      >
                         <Link
                           href={`/debate/${s.id}`}
-                          className="px-2.5 py-1 rounded bg-slate-200/70 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-[11px] font-medium text-slate-700 dark:text-slate-300 transition"
+                          className="min-w-0 flex-1 flex items-start gap-2.5"
                         >
-                          View
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
+                              isCompleted ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
+                            }`}
+                            title={isCompleted ? 'Completed' : 'Active'}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition leading-snug">
+                              {s.topic}
+                            </p>
+                            
+                            {/* Badges & Meta Row */}
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                              {/* Mode Badge */}
+                              <span
+                                className={`px-1.5 py-0.5 rounded font-medium ${
+                                  s.mode === 'COLLABORATIVE'
+                                    ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60'
+                                    : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60'
+                                }`}
+                              >
+                                {s.mode === 'COLLABORATIVE' ? 'Collaborative' : 'Red-Team'}
+                              </span>
+
+                              {/* Rounds Badge */}
+                              <span className="font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                {s.total_rounds || 3} Rds
+                              </span>
+
+                              {/* Inferred Topic Tags */}
+                              {tags.slice(0, 2).map((t) => (
+                                <span
+                                  key={t}
+                                  className="text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded"
+                                >
+                                  #{t}
+                                </span>
+                              ))}
+
+                              {/* Relative Timestamp */}
+                              {relativeTime && (
+                                <span className="text-slate-400 dark:text-slate-500 font-mono ml-auto">
+                                  {relativeTime}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </Link>
-                        <button
-                          type="button"
-                          onClick={() => setSessionToDelete({ id: s.id, topic: s.topic })}
-                          className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-                          title="Delete session"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+
+                        <div className="flex items-center gap-1.5 shrink-0 self-center">
+                          <Link
+                            href={`/debate/${s.id}`}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-200/80 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-xs font-medium text-slate-700 dark:text-slate-300 transition shadow-xs"
+                          >
+                            Open
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => setSessionToDelete({ id: s.id, topic: s.topic })}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                            title="Delete session"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
